@@ -22,7 +22,8 @@ dependencies = [
     "pyscf",
     "openfermionpyscf",
     "qiskit[visualization]",
-    "quimb"
+    "quimb",
+    "pathos"
 ]
 
 [project.urls]

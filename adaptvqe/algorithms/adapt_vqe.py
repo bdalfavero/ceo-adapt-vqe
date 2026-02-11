@@ -12,6 +12,8 @@ import abc
 import numpy as np
 import scipy
 
+from pathos.pools import ProcessPool as Pool
+
 from itertools import chain
 from scipy.sparse import csc_matrix, issparse
 from scipy.sparse.linalg import expm, expm_multiply
@@ -483,7 +485,13 @@ class AdaptVQE(metaclass=abc.ABCMeta):
 
         return state
 
-    def rank_gradients(self, coefficients=None, indices=None, silent=False):
+    def rank_gradients(self, coefficients=None, indices=None, silent=False, nworkers=1):
+        if nworkers == 1:
+            return self._rank_gradients_serial(coefficients, indices, silent)
+        else:
+            return self._rank_gradients_parallel(coefficients, indices, silent, nworkers)
+
+    def _rank_gradients_serial(self, coefficients=None, indices=None, silent=False):
         """
         Selects the operators that currently have the largest gradients. The number of selected operators depends on
         mode - TETRIS or not - and instance variable self.candidates.
@@ -539,6 +547,83 @@ class AdaptVQE(metaclass=abc.ABCMeta):
             if np.abs(gradient) < 10**-8:
                 continue
 
+            # Find the index of the operator in the ordered gradient list
+            sel_gradients, sel_indices = self.place_gradient(
+                gradient, index, sel_gradients, sel_indices
+            )
+
+        total_norm = np.sqrt(total_norm)
+
+        if sel_gradients:
+            max_norm = sel_gradients[0]
+        else:
+            # All operators have negligeable gradients
+            max_norm = 0
+
+        print("Total gradient norm: {}".format(total_norm))
+
+        return sel_indices, sel_gradients, total_norm, max_norm
+
+    def _rank_gradients_parallel(self, coefficients=None, indices=None, silent=False, nworkers=1):
+        """
+        Selects the operators that currently have the largest gradients. The number of selected operators depends on
+        mode - TETRIS or not - and instance variable self.candidates.
+        If coefficients and indices are None, the gradients will be calculated in the current state. This is what
+        happens in the gradient screening of ADAPT-VQE.
+
+        Arguments:
+            coefficients (list): ansatz coefficients
+            indices (list): ansatz indices
+            silent (bool): whether to print information along the execution
+            nworkers (int): number of processes to use
+
+        Returns:
+          selected_index (int): the index that labels the selected operator
+          selected_gradient (float): the norm of the gradient of that operator
+          total_norm (float): the total gradient norm
+          max_norm (float): the maximum gradient magnitude
+        """
+
+        if not silent:
+            print(
+                f"Creating list of up to {self.window} operators ordered by gradient magnitude..."
+            )
+
+        if self.verbose and not silent:
+            print("\nNon-Zero Gradients (tolerance E-8):")
+
+        # If we're using a CEO pool: Compute QE (parent) gradients
+        def _parent_gradient_callback(idx):
+            return self.eval_candidate_gradient(idx, coefficients, indices)
+
+        proc_pool = Pool(nworkers)
+        parent_gradient_list = proc_pool.map(_parent_gradient_callback, self.pool.parent_range)
+        parent_gradients = dict(zip(self.pool.parent_range, parent_gradient_list))
+
+        # Compute actual pool gradients (singles/doubles)
+        def _pool_gradient_callback(index):
+            gradient = self.eval_candidate_gradient(index, coefficients, indices)
+            this_norm = gradient**2
+
+            nnz_g_parents = []
+            parents = self.pool.get_parents(index)
+
+            if parents is not None:
+                nnz_g_parents = [p_index for p_index in parents if parent_gradients[p_index]]
+
+            gradient = self.penalize_gradient(gradient, index, silent,nnz_g_parents)
+            return this_norm, gradient
+
+        pool_idxs = list(chain(range(self.pool.parent_range.start),
+                          range(self.pool.parent_range.start,self.pool.size)))
+        op_norms_gradients = proc_pool.map(_pool_gradient_callback, pool_idxs)
+        pool_norms = [t[0] for t in op_norms_gradients]
+        pool_gradients = [t[1] for t in op_norms_gradients]
+        total_norm = sum(pool_norms)
+
+        sel_gradients = []
+        sel_indices = []
+        for gradient, index in zip(pool_gradients, pool_idxs):
             # Find the index of the operator in the ordered gradient list
             sel_gradients, sel_indices = self.place_gradient(
                 gradient, index, sel_gradients, sel_indices
