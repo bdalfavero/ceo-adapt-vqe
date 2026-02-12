@@ -168,3 +168,5 @@ data/
 .DS_Store
 
 .idea/
+
+*.csv
