@@ -11,7 +11,7 @@ max_mpo_bond = 100
 max_mps_bond = 10
 
 system_sizes = [4, 6, 8]
-nworkers = [1, 2]
+nworkers = [1, 2, 4, 6]
 all_records = []
 
 for l in system_sizes:
