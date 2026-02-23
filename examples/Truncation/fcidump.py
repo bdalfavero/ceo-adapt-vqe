@@ -86,5 +86,5 @@ output_dict = {
         "run": times
     }
 }
-with open("data/fciump_results.json", "w") as f:
+with open("data/fciump_results_ceo.json", "w") as f:
     json.dump(output_dict, f)
