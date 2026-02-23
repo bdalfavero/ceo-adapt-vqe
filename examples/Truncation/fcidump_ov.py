@@ -42,15 +42,14 @@ num_elec_a = (n_electrons + spin) // 2
 num_elec_b = (n_electrons - spin) // 2
 nelec = (num_elec_a, num_elec_b)
 
-print("Building pools.")
 start_time = perf_counter_ns()
-ceo_pool = CEO(h)
+ov_pool = OccupiedVirtualCEO(h, n_occ=nelec)
 end_time = perf_counter_ns()
-elapsed_time_ceo_pool = abs(end_time - start_time)
+elapsed_time_ov_pool = abs(end_time - start_time)
 
 print("Running.")
-ceo_adapt = TensorNetAdapt(
-    pool=ceo_pool,
+ov_adapt = TensorNetAdapt(
+    pool=ov_pool,
     # molecule=mol,
     custom_hamiltonian=h,
     max_adapt_iter=1,
@@ -65,24 +64,24 @@ ceo_adapt = TensorNetAdapt(
 times = []
 for i in range(10):
     start_time = perf_counter_ns()
-    ceo_adapt.run_iteration()
-    ceo_energy = ceo_adapt.energy
+    ov_adapt.run_iteration()
+    ceo_energy = ov_adapt.energy
     end_time = perf_counter_ns()
-    elapsed_time_ceo_adapt = abs(end_time - start_time)
-    times.append(elapsed_time_ceo_adapt)
+    elapsed_time_ov_adapt = abs(end_time - start_time)
+    times.append(elapsed_time_ov_adapt)
 
-pool_size = len(ceo_pool.operators)
+pool_size = len(ov_pool.operators)
 
-fci_err = abs(h.ground_energy - ceo_adapt.energy)
+fci_err = abs(h.ground_energy - ov_adapt.energy)
 
 output_dict = {
     "errors": fci_err,
     "energies": {
         "exact": h.ground_energy,
-        "ceo": ceo_adapt.energy
+        "ceo": ov_adapt.energy
     },
     "times": {
-        "build": elapsed_time_ceo_pool,
+        "build": elapsed_time_ov_pool,
         "run": times
     }
 }
