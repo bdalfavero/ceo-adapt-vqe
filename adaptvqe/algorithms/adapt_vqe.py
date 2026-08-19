@@ -62,7 +62,8 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         track_prep_g=False,
         previous_data=None,
         max_mpo_bond=None,
-        max_mps_bond=None
+        max_mps_bond=None,
+        skip_converged_rename=False
     ):
         """
         Arguments:
@@ -108,6 +109,8 @@ class AdaptVQE(metaclass=abc.ABCMeta):
             frozen_orbitals (list): Indices of orbitals that are considered to be permanently occupied. Note that
                 virtual orbitals are not yet implemented.
             previous_data (AdaptData): data from a previous run of ADAPT we wish to continue
+            skip_converged_rename - Skip rename of the data file upon convergence. Defaults to False.
+            Note that this is used to run an artificially high number of iterations.
         """
 
         self.pool = pool
@@ -133,6 +136,7 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         self.track_prep_g = track_prep_g
         self.max_mpo_bond = max_mpo_bond
         self.max_mps_bond = max_mps_bond
+        self.skip_converged_rename = skip_converged_rename
 
         # Attributes describing type of CEO pool, when applicable. The algorithm runs differently for each of them
         self.dvg = "DVG" in self.pool.name
@@ -1547,11 +1551,13 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         finished = False
 
         if total_norm < self.threshold and self.convergence_criterion == "total_g_norm":
-            self.converged()
+            if not self.skip_converged_rename:
+                self.converged()
             finished = True
 
         if max_norm < self.threshold and self.convergence_criterion == "max_g":
-            self.converged()
+            if not self.skip_converged_rename:
+                self.converged()
             finished = True
 
         return finished
