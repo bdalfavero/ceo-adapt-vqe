@@ -3932,6 +3932,7 @@ class TensorNetAdapt(AdaptVQE):
             coefficients = [-c for c in reversed(coefficients)]
             indices = reversed(indices)
 
+        # TODO do all of these multiplications at once.
         # Apply e ** (coefficient * operator) to the state (ket) for each
         # operator in the ansatz, following the order of the list
         for coefficient, index in zip(coefficients, indices):
