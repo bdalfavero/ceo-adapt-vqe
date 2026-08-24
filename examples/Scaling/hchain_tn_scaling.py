@@ -38,21 +38,19 @@ class ScalingResult:
 
 def run_n_chi(N: int, chi: int, num_iter: int=NUM_ITER):
     r = 1.5
-    N = 3
     geometry = [['H', [0, 0, i * r]] for i in range(N)]
     basis = 'sto-3g'
-    multiplicity = 2  # odd number of electrons
+    multiplicity = 1
     charge = 0
-    mol = MolecularData(geometry, basis, multiplicity, charge, description='H3')
+    mol = MolecularData(geometry, basis, multiplicity, charge, description=f'H{N}')
     mol = run_pyscf(mol, run_fci=True, run_ccsd=False)  # CCSD doesn't work here?
     exact_energy = mol.fci_energy
     pool = DVE_CEO(mol)
 
-    chi = 10
     my_adapt = TensorNetAdapt(
         pool=pool,
         molecule=mol,
-        max_adapt_iter=NUM_ITER + 1,
+        max_adapt_iter=num_iter + 1,
         recycle_hessian=True,
         tetris=True,
         verbose=True,
@@ -65,7 +63,6 @@ def run_n_chi(N: int, chi: int, num_iter: int=NUM_ITER):
 
     energies = []
     times = []
-    num_iter = 15
     for _ in range(num_iter):
         start_time = perf_counter_ns()
         my_adapt.run_iteration()
@@ -75,9 +72,13 @@ def run_n_chi(N: int, chi: int, num_iter: int=NUM_ITER):
         times.append(elapsed_time)
     return ScalingResult(N, chi, exact_energy, times, energies)
 
+
 if __name__ == "__main__":
-    N = 4
-    chi = 10
-    result = run_n_chi(N, chi)
-    df = result.to_dataframe()
-    df.to_csv("hchain_results.csv", index=False)
+    dfs = []
+    for N in [8, 10, 12]:
+        for chi in [5, 10, 15]:
+            result = run_n_chi(N, chi, num_iter=5)
+            df = result.to_dataframe()
+            dfs.append(df)
+            total_df = pd.concat(dfs)
+            total_df.to_csv("hchain_results.csv", index=False)
