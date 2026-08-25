@@ -206,10 +206,12 @@ class PoolOperator(metaclass=abc.ABCMeta):
         """
         self.imp_operator = get_sparse_operator(self.q_operator, self.n)
     
-    def create_mpo(self, nq: Optional[int]=None, max_bond: int=1):
+    def create_mpo(self, nq: Optional[int]=None, max_bond: int=1, to_backend=None):
         """Create an MPO version of the operator."""
 
         self.mpo_operator = qubop_to_mpo(self.q_operator, max_bond, nq)
+        if to_backend is not None:
+            self.mpo_operator.apply_to_arrays(to_backend)
 
     @property
     def f_operator(self):
@@ -232,7 +234,10 @@ class PoolOperator(metaclass=abc.ABCMeta):
 class OperatorPool(metaclass=abc.ABCMeta):
     name = None
 
-    def __init__(self, molecule=None, frozen_orbitals=[], n=None, source_ops=None, fermionic_swaps=False, max_mpo_bond=None):
+    def __init__(
+        self, molecule=None, frozen_orbitals=[], n=None, source_ops=None, fermionic_swaps=False, max_mpo_bond=None,
+        to_backend=None
+    ):
         """
         Arguments:
             molecule (PyscfMolecularData): the molecule for which we will use the pool
@@ -244,6 +249,7 @@ class OperatorPool(metaclass=abc.ABCMeta):
         """
 
         self.max_mpo_bond = max_mpo_bond
+        self.to_backend = to_backend
 
         if self.name is None:
             raise NotImplementedError("Subclasses must define a pool name.")
@@ -507,7 +513,7 @@ class OperatorPool(metaclass=abc.ABCMeta):
             if self.imp_type == ImplementationType.SPARSE:
                 self.operators[index].create_sparse()
             elif self.imp_type == ImplementationType.TENSORS:
-                self.operators[index].create_mpo()
+                self.operators[index].create_mpo(to_backend=self.to_backend)
             else:
                 raise AttributeError("PoolOperator does not have imp_operator attribute because an implementation type "
                                      "hasn't been set for this pool. "
@@ -531,7 +537,7 @@ class OperatorPool(metaclass=abc.ABCMeta):
         """Convert the qubit operator form to an MPO."""
 
         if self.operators[index].mpo_operator is None:
-            self.operators[index].create_mpo(nq=nq, max_bond=self.max_mpo_bond)
+            self.operators[index].create_mpo(nq=nq, max_bond=self.max_mpo_bond, to_backend=self.to_backend)
         op_mps = self.operators[index].mpo_operator
         return op_mps
 
@@ -1514,7 +1520,7 @@ class PauliPool(SingletGSD):
         """exponentiates a pool operator times a coefficient, then multiplies it by a state."""
 
         if self.operators[index].mpo_operator is None:
-            self.operators[index].create_mpo(max_bond=self.max_mpo_bond)
+            self.operators[index].create_mpo(max_bond=self.max_mpo_bond, to_backend=self.to_backend)
         op_mps = self.operators[index].mpo_operator
     
         # There is a weird thing in quimb where we can't multiply an MPS by 0.

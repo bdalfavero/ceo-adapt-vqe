@@ -20,6 +20,7 @@ import openfermion as of
 from openfermion import get_sparse_operator, count_qubits
 from openfermion.transforms import get_fermion_operator, freeze_orbitals
 
+import torch
 from quimb.tensor.tensor_1d import MatrixProductState, MatrixProductOperator
 
 from .adapt_data import AdaptData
@@ -298,6 +299,8 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         ).transpose()
 
         self.tn_ref_state = computational_basis_mps(self.ref_det)
+        if self.to_backend is not None:
+            self.tn_ref_state.apply_to_arrays(self.to_backend)
 
         hamiltonian = self.molecule.get_molecular_hamiltonian()
 
@@ -668,6 +671,9 @@ class AdaptVQE(metaclass=abc.ABCMeta):
             penalty = 1
 
         gradient = gradient / penalty
+
+        if isinstance(gradient, torch.Tensor):
+            gradient = gradient.cpu().numpy()
 
         if np.abs(gradient) > 10**-8:
 
@@ -3877,6 +3883,10 @@ class TensorNetAdapt(AdaptVQE):
 
         ket = self.get_state(coefficients, indices, ref_state)
 
+        if self.to_backend is not None:
+            observable.apply_to_arrays(self.to_backend)
+            ket.apply_to_arrays(self.to_backend)
+
         if orb_params is not None:
             orb_rotation_generator = self.create_orb_rotation_generator(orb_params)
             if orb_rotation_generator is not None:
@@ -3977,6 +3987,8 @@ class TensorNetAdapt(AdaptVQE):
         else:
             ham_jw = of.transforms.jordan_wigner(hamiltonian)
             self.hamiltonian_mpo = qubop_to_mpo(ham_jw, self.max_mpo_bond)
+        if self.to_backend is not None:
+            self.hamiltonian_mpo.apply_to_arrays(self.to_backend)
 
     def create_orb_rotation_ops(self):
         """
@@ -4049,7 +4061,10 @@ class TensorNetAdapt(AdaptVQE):
         # gradient = 2 * (left_matrix.dot(right_matrix))[0, 0].real
         gradient = 2 * (left_matrix.H @ right_matrix).data.real
 
-        return gradient
+        if isinstance(gradient, torch.Tensor):
+            return gradient.cpu().numpy()
+        else:
+            return gradient
 
     def eval_candidate_gradients_prepending(
         self,
@@ -4239,7 +4254,10 @@ class TensorNetAdapt(AdaptVQE):
 
         gradient = self.evaluate_observable(observable, coefficients, indices)
 
-        return gradient
+        if isinstance(gradient, torch.Tensor):
+            return gradient.cpu().numpy()
+        else:
+            return gradient
 
     def perform_sim_transform(self, orb_params):
         """
