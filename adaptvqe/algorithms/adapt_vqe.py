@@ -63,7 +63,8 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         previous_data=None,
         max_mpo_bond=None,
         max_mps_bond=None,
-        skip_converged_rename=False
+        skip_converged_rename=False,
+        to_backend=None
     ):
         """
         Arguments:
@@ -137,6 +138,7 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         self.max_mpo_bond = max_mpo_bond
         self.max_mps_bond = max_mps_bond
         self.skip_converged_rename = skip_converged_rename
+        self.to_backend = to_backend
 
         # Attributes describing type of CEO pool, when applicable. The algorithm runs differently for each of them
         self.dvg = "DVG" in self.pool.name
@@ -3938,7 +3940,10 @@ class TensorNetAdapt(AdaptVQE):
         for coefficient, index in zip(coefficients, indices):
             # Exponentiate the operator and update ket to represent the state after
             # this operator has been applied
-            state = self.pool.tn_expm_mult_state(coefficient, index, state, max_bond=self.max_mps_bond, big_endian=False)
+            state = self.pool.tn_expm_mult_state(
+                coefficient, index, state, max_bond=self.max_mps_bond, big_endian=False,
+                to_backend=self.to_backend
+                )
         if bra:
             state = state.H
 
@@ -4172,8 +4177,14 @@ class TensorNetAdapt(AdaptVQE):
             index = indices[operator_pos]
 
             # left_matrix = self.pool.tn_expm_mult_state(coefficient, index, left_matrix)
-            left_matrix = self.pool.tn_expm_mult_state(coefficient, index, left_matrix.H, max_bond=self.max_mps_bond).H
-            right_matrix = self.pool.tn_expm_mult_state(coefficient, index, right_matrix, max_bond=self.max_mps_bond)
+            left_matrix = self.pool.tn_expm_mult_state(
+                coefficient, index, left_matrix.H, max_bond=self.max_mps_bond,
+                to_bakend=self.to_backend
+            ).H
+            right_matrix = self.pool.tn_expm_mult_state(
+                coefficient, index, right_matrix, max_bond=self.max_mps_bond,
+                to_backend=self.to_backend
+            )
 
             # gradient = 2 * (left_matrix.H @ right_matrix.gate_with_mpo(operator)).real
             gradient = 2 * (left_matrix @ right_matrix.gate_with_mpo(operator)).real

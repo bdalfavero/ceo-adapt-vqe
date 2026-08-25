@@ -604,7 +604,7 @@ class OperatorPool(metaclass=abc.ABCMeta):
             m = m.real
             return m
         
-    def tn_expm_mult_state(self, coefficient, index, state, max_bond, big_endian=True):
+    def tn_expm_mult_state(self, coefficient, index, state, max_bond, big_endian=True, to_backend=None):
         """Multiply the state by the exponential of a pool operator. In the general case,
         this is done by getting the circuit for the exponential of the operator and using
         TEBD to multiply it by the states."""
@@ -614,7 +614,8 @@ class OperatorPool(metaclass=abc.ABCMeta):
         # print(evolution_circuit)
         # print(qasm_str)
         circuit_mps = qtn.circuit.CircuitMPS.from_openqasm2_str(
-            qasm_str, psi0=state.copy(), max_bond=max_bond, progbar=False
+            qasm_str, psi0=state.copy(), max_bond=max_bond, progbar=False,
+            to_backend=to_backend
         )
         return circuit_mps.psi
 
