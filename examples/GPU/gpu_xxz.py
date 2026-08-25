@@ -38,7 +38,7 @@ end_time = perf_counter_ns()
 elapsed = abs(end_time - start_time)
 print(f"No GPU: elapsed time {elapsed:5.4e} ns")
 
-pool = FullPauliPool(n=l, max_mpo_bond=max_mpo_bond, to_backend=lambda x: to_backend(x, device_name="mps"))
+pool = FullPauliPool(n=l, max_mpo_bond=max_mpo_bond, to_backend=to_backend)
 my_adapt = TensorNetAdapt(
     pool=pool,
     custom_hamiltonian=h,
@@ -51,7 +51,7 @@ my_adapt = TensorNetAdapt(
     rand_degenerate=True,
     max_mpo_bond=100,
     max_mps_bond = 20,
-    to_backend=lambda x: to_backend(x, device_name="mps")
+    to_backend=to_backend
 )
 my_adapt.initialize()
 start_time = perf_counter_ns()
