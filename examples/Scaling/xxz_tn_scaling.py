@@ -117,10 +117,10 @@ def run_n_chi(N: int, chi: int, num_iter: int=NUM_ITER):
 
 if __name__ == "__main__":
     dfs = []
-    for N in [8, 10]:
-        for chi in [5, 7]:
+    for N in [8, 10, 20, 30]:
+        for chi in [5, 7, 9]:
             print(f"N={N} chi={chi}")
-            result = run_n_chi(N, chi, num_iter=5)
+            result = run_n_chi(N, chi, num_iter=20)
             df = result.to_dataframe()
             dfs.append(df)
             total_df = pd.concat(dfs)

@@ -72,21 +72,24 @@ def _(df_xxz, np):
 
 @app.cell
 def _(chi_vals, df_xxz, l_vals, np, plt):
-    fig_xxz, ax_xxz = plt.subplots(len(l_vals), len(chi_vals))
+    fig_xxz, ax_xxz = plt.subplots(len(l_vals), len(chi_vals), figsize=(len(l_vals) * 2., len(chi_vals) * 2.5))
 
     for i, l in enumerate(np.unique(df_xxz["N"])):
         for j, chi in enumerate(np.unique(df_xxz["chi"])):
             ax_xxz[i, j].set_title(f"L={l} chi={chi}")
             df_queried = df_xxz.query(f"N=={l} and chi=={chi}")
             right_ax_xxz = ax_xxz[i,j].twinx()
-            ax_xxz[i,j].plot(df_queried["iteration"], df_queried["abs_error"], color="blue")
+            ax_xxz[i,j].plot(df_queried["iteration"], df_queried["rel_error"], color="blue")
+            ax_xxz[i,j].set_yscale("log")
+            # right_ax_xxz.set_yscale("log")
             right_ax_xxz.plot(df_queried["iteration"], df_queried["time"], color="red")
-            ax_xxz[i,j].set_ylabel("Aboslute error", color="blue")
+            ax_xxz[i,j].set_ylabel("Relative error", color="blue")
             ax_xxz[i,j].set_xlabel("Iteration")
             right_ax_xxz.set_ylabel("Iteration time", color="red")
 
     fig_xxz.tight_layout()
-    plt.show()
+    # plt.show()
+    plt.savefig("xxz_scaling.pdf")
     return
 
 
