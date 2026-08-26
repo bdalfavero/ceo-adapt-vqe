@@ -10,7 +10,7 @@ from adaptvqe.pools import DVE_CEO, GSD, PairedGSD
 MAX_MPO_BOND = 200
 
 if __name__ == "__main__":
-    N = 4
+    N = 16
     chi = 5
     num_iter = 5
 
@@ -20,7 +20,7 @@ if __name__ == "__main__":
     multiplicity = 1
     charge = 0
     mol = MolecularData(geometry, basis, multiplicity, charge, description=f'H{N}')
-    mol = run_pyscf(mol, run_fci=True, run_ccsd=True, run_scf=True)  # CCSD doesn't work here?
+    mol = run_pyscf(mol, run_fci=False, run_ccsd=True, run_scf=True)  # CCSD doesn't work here?
     hf_energy = mol.hf_energy
     exact_energy = mol.ccsd_energy
     print(f"hf_energy = {hf_energy}")
@@ -45,6 +45,7 @@ if __name__ == "__main__":
         max_mps_bond=chi,
         skip_converged_rename=True
     )
+    print("Initializing...")
     start_time = perf_counter_ns()
     my_adapt.initialize()
     end_time = perf_counter_ns()
