@@ -120,7 +120,7 @@ if __name__ == "__main__":
     for N in [8, 10, 20, 30]:
         for chi in [5, 7, 9]:
             print(f"N={N} chi={chi}")
-            result = run_n_chi(N, chi, num_iter=20)
+            result = run_n_chi(N, chi, num_iter=50)
             df = result.to_dataframe()
             dfs.append(df)
             total_df = pd.concat(dfs)
