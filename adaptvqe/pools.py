@@ -1020,7 +1020,7 @@ class GSD(OperatorPool):
 
         return m
 
-    def get_circuit(self, indices, coefficients, staircase_method=False):
+    def get_circuit(self, indices, coefficients, staircase_method=False, big_endian=True):
         """
         Returns the circuit corresponding to the ansatz defined by the arguments, as a Qiskit QuantumCircuit.
         The function is specific for pools where the generators are sums of commuting Paulis, such as GSD or Pauli pools
@@ -1039,9 +1039,9 @@ class GSD(OperatorPool):
             qubit_operator = coefficient * op.q_operator
 
             if staircase_method:
-                qc = pauli_exp_circuit(qubit_operator, self.n, revert_endianness=True)
+                qc = pauli_exp_circuit(qubit_operator, self.n, revert_endianness=big_endian)
             else:
-                qc = fe_circuit(op.source_orbs, op.target_orbs, coefficient, self.n, True)
+                qc = fe_circuit(op.source_orbs, op.target_orbs, coefficient, self.n, big_endian)
 
             circuit = circuit.compose(qc)
             circuit.barrier()
