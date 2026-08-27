@@ -172,3 +172,5 @@ data/
 __marimo__/
 *.csv
 profile_results
+*.pkl
+*.pdf
