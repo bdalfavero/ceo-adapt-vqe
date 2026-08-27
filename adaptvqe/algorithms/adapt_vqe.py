@@ -143,12 +143,9 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         self.dve = "DVE" in self.pool.name
         self.mvp = "MVP" in self.pool.name
 
-        breakpoint()
         self.data = previous_data  # AdaptData object
         self.initialize_hamiltonian()  # Initialize and store Hamiltonian and initial energy
-        breakpoint()
         self.create_orb_rotation_ops()  # Create list of orbital rotation operators
-        breakpoint()
         self.gradients = np.array(())
         self.orb_opt_dim = len(self.orb_ops)
         if previous_data is None:
@@ -158,7 +155,6 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         )  # Transform Hamiltonian into measurement
         self.set_window()  # Set the number of top gradient operators we will need to consider in each iteration
         self.shots = shots
-        breakpoint()
 
         if self.recycle_hessian:
             self.inv_hessian = np.eye(
@@ -166,7 +162,6 @@ class AdaptVQE(metaclass=abc.ABCMeta):
             )  # Initialize inverse Hessian at identity
         else:
             self.inv_hessian = None
-        breakpoint()
 
         self.verify_inputs()
         if previous_data is not None:
@@ -178,7 +173,6 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         if self.verbose:
             print(f"\n{self.name} prepared with the following settings:")
             self.print_settings()
-        breakpoint()
 
     def verify_inputs(self):
 
@@ -294,33 +288,26 @@ class AdaptVQE(metaclass=abc.ABCMeta):
 
         self.n = self.molecule.n_qubits - len(self.frozen_orbitals)
         self.molecule.n_electrons -= len(self.frozen_orbitals)
-        breakpoint()
 
         # Set the Hartree Fock state as reference
         self.ref_det = get_hf_det(self.molecule.n_electrons, self.n)
-        breakpoint()
 
-        # self.sparse_ref_state = csc_matrix(
-        #     ket_to_vector(self.ref_det), dtype=complex
-        # ).transpose()
-        # breakpoint()
+        self.sparse_ref_state = csc_matrix(
+            ket_to_vector(self.ref_det), dtype=complex
+        ).transpose()
 
         self.tn_ref_state = computational_basis_mps(self.ref_det)
-        breakpoint()
 
         hamiltonian = self.molecule.get_molecular_hamiltonian()
-        breakpoint()
 
         if self.frozen_orbitals:
             hamiltonian = get_fermion_operator(hamiltonian)
             hamiltonian = freeze_orbitals(hamiltonian, self.frozen_orbitals)
-        breakpoint()
 
         self.file_name = (
             f"{self.molecule.description}_r={self.molecule.geometry[1][1][2]}"
         )
         self.exact_energy = self.molecule.fci_energy
-        breakpoint()
 
         return hamiltonian
 
