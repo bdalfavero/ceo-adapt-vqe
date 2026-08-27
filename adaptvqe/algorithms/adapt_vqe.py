@@ -7,6 +7,8 @@ Created on Wed Jun 29 10:00:03 2022
 
 from warnings import warn
 
+import pickle
+
 from copy import copy, deepcopy
 import abc
 import numpy as np
@@ -63,7 +65,8 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         previous_data=None,
         max_mpo_bond=None,
         max_mps_bond=None,
-        skip_converged_rename=False
+        skip_converged_rename=False,
+        mpo_filename=None,
     ):
         """
         Arguments:
@@ -137,6 +140,7 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         self.max_mpo_bond = max_mpo_bond
         self.max_mps_bond = max_mps_bond
         self.skip_converged_rename = skip_converged_rename
+        self.mpo_filename = mpo_filename
 
         # Attributes describing type of CEO pool, when applicable. The algorithm runs differently for each of them
         self.dvg = "DVG" in self.pool.name
@@ -307,7 +311,12 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         self.file_name = (
             f"{self.molecule.description}_r={self.molecule.geometry[1][1][2]}"
         )
-        self.exact_energy = self.molecule.fci_energy
+        # if hasattr(self.molecule, "fci_energy"):
+        if self.molecule.fci_energy is not None:
+            self.exact_energy = self.molecule.fci_energy
+        else:
+            warn("Molecule has no FCI energy, falling back on CCSD.")
+            self.exact_energy = self.molecule.ccsd_energy
 
         return hamiltonian
 
@@ -1364,6 +1373,7 @@ class AdaptVQE(metaclass=abc.ABCMeta):
             self.energy = initial_energy
 
             # We're starting a fresh ADAPT-VQE; create new AdaptData instance and initialize indices, coefficients
+            assert self.exact_energy is not None
             self.data = AdaptData(
                 initial_energy,
                 self.pool,
@@ -3968,11 +3978,15 @@ class TensorNetAdapt(AdaptVQE):
         """
 
         self.hamiltonian = hamiltonian
-        if isinstance(hamiltonian, of.QubitOperator):
-            self.hamiltonian_mpo = qubop_to_mpo(hamiltonian, self.max_mpo_bond)
+        if self.mpo_filename is None:
+            if isinstance(hamiltonian, of.QubitOperator):
+                self.hamiltonian_mpo = qubop_to_mpo(hamiltonian, self.max_mpo_bond)
+            else:
+                ham_jw = of.transforms.jordan_wigner(hamiltonian)
+                self.hamiltonian_mpo = qubop_to_mpo(ham_jw, self.max_mpo_bond)
         else:
-            ham_jw = of.transforms.jordan_wigner(hamiltonian)
-            self.hamiltonian_mpo = qubop_to_mpo(ham_jw, self.max_mpo_bond)
+            with open(self.mpo_filename, "rb") as f:
+                self.hamiltonian_mpo = pickle.load(f)
 
     def create_orb_rotation_ops(self):
         """

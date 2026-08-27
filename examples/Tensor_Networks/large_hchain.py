@@ -43,7 +43,8 @@ if __name__ == "__main__":
         threshold=0.1,
         max_mpo_bond=MAX_MPO_BOND,
         max_mps_bond=chi,
-        skip_converged_rename=True
+        skip_converged_rename=True,
+        mpo_filename="hchain_mpo_N16_chi1000000.pkl"
     )
     print("Initializing...")
     start_time = perf_counter_ns()
