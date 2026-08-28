@@ -6,12 +6,13 @@ app = marimo.App(width="medium")
 
 @app.cell
 def _():
+    import os
     import pandas as pd
     import numpy as np
     import matplotlib.pyplot as plt
     import seaborn as sns
 
-    return np, pd, plt
+    return np, os, pd, plt
 
 
 @app.cell
@@ -56,8 +57,15 @@ def _(mo):
 
 
 @app.cell
-def _(pd):
-    df_xxz = pd.read_csv("xxz_results.csv")
+def _(os, pd):
+    data_dir = "xxz_scaling_results"
+    data_files = os.listdir(data_dir)
+    xxz_dfs = []
+    for f in data_files:
+        xxz_dfs.append(pd.read_csv(data_dir + "/" + f))
+    df_xxz = pd.concat(xxz_dfs)
+
+    # df_xxz = pd.read_csv("xxz_results.csv")
     print(df_xxz.head())
     return (df_xxz,)
 
