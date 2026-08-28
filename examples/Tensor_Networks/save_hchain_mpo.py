@@ -5,7 +5,7 @@ from openfermionpyscf import run_pyscf
 from adaptvqe.tensor_helpers import qubop_to_mpo
 
 if __name__ == "__main__":
-    N = 16
+    N = 4
     max_mpo_bond = int(1e6)
     num_iter = 5
 
