@@ -16,6 +16,7 @@ from openfermion import (
     jordan_wigner,
 )
 import qiskit
+from qiskit.quantum_info.operators import SparsePauliOp
 from qiskit.qasm3 import dumps
 
 # todo: use stable version of qiskit only
@@ -188,9 +189,10 @@ def to_qiskit_operator(of_operator, n=None, little_endian=True):
     for term in of_operator.get_operators():
         qiskit_term = to_qiskit_term(term, n, little_endian)
         if qiskit_operator is None:
-            qiskit_operator = qiskit_term
+            qiskit_operator = SparsePauliOp(qiskit_term)
         else:
-            qiskit_operator += qiskit_term
+            print(qiskit_operator.num_qubits, SparsePauliOp(qiskit_term).num_qubits, term, qiskit_term)
+            qiskit_operator += SparsePauliOp(qiskit_term)
 
     return qiskit_operator
 
