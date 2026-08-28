@@ -3744,12 +3744,16 @@ class SampledLinAlgAdapt(LinAlgAdapt):
         orb_params=None,
     ):
         from scipy.sparse import issparse
-        from qiskit_ibm_runtime import EstimatorV2 as Estimator
+        # from qiskit_ibm_runtime import EstimatorV2 as Estimator
+        from qiskit_aer.primitives import Estimator
         from qiskit_ibm_runtime.fake_provider import FakeFez
 
         backend = FakeFez()
 
-        if self.data is None:
+        try:
+            data = self.data
+            qc = data.get_circuit(self.pool,include_ref=True)
+        except AttributeError:
             ket = self.get_state(coefficients, indices, ref_state)
 
             if issparse(ket):
@@ -3760,14 +3764,13 @@ class SampledLinAlgAdapt(LinAlgAdapt):
             ket = ket[:, 0]
             qc = QuantumCircuit(self.n)
             qc.initialize(ket)
-            qc = transpile(qc, basis_gates=['u1', 'u2', 'u3', 'cx'])
-        else:
-            data = self.data
-            qc = data.get_circuit(self.pool,include_ref=True)
+            # qc = transpile(qc, basis_gates=['u1', 'u2', 'u3', 'cx'])
 
-        estimator = Estimator(backend)
+        # estimator = Estimator(backend)
+        estimator = Estimator()
         estimator.options.default_shots = self.shots
-        job = estimator.run([(qc, observable)])
+        # job = estimator.run([(qc, observable)])
+        job = estimator.run(qc, observable)
         result = job.result()
         exp_value = result.values[0]
 
