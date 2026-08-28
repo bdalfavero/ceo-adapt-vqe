@@ -41,6 +41,12 @@ class TestToTerm(unittest.TestCase):
         target = Pauli("YIYIY")
         self.assertEqual(target, converted)
 
+    def test_iixx_little_endian(self):
+        term = of.QubitOperator("X2 X3")
+        converted = to_qiskit_term(term, 4, False)
+        target = Pauli("IIXX")
+        self.assertEqual(target, converted)
+
 
 
 
