@@ -10,8 +10,8 @@ from adaptvqe.pools import DVE_CEO, GSD, PairedGSD
 MAX_MPO_BOND = 200
 
 if __name__ == "__main__":
-    # N = 16
-    N = 4
+    N = 16
+    # N = 4
     chi = 50
     num_iter = 5
 
@@ -45,8 +45,8 @@ if __name__ == "__main__":
         max_mpo_bond=MAX_MPO_BOND,
         max_mps_bond=chi,
         skip_converged_rename=True,
-        # mpo_filename="hchain_mpo_N16_chi1000000.pkl"
-        mpo_filename="hchain_mpo_N4_chi1000000.pkl"
+        mpo_filename="hchain_mpo_N16_chi1000000.pkl"
+        # mpo_filename="hchain_mpo_N4_chi1000000.pkl"
     )
     print("Initializing...")
     start_time = perf_counter_ns()
