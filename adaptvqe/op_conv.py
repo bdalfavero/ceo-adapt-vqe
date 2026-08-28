@@ -194,7 +194,6 @@ def to_qiskit_operator(of_operator, n=None, little_endian=True):
         if qiskit_operator is None:
             qiskit_operator = SparsePauliOp(qiskit_term)
         else:
-            print(qiskit_operator.num_qubits, SparsePauliOp(qiskit_term).num_qubits, term, qiskit_term)
             qiskit_operator += SparsePauliOp(qiskit_term)
 
     return qiskit_operator

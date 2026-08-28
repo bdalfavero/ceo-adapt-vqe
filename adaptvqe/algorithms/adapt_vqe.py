@@ -20,6 +20,8 @@ import openfermion as of
 from openfermion import get_sparse_operator, count_qubits
 from openfermion.transforms import get_fermion_operator, freeze_orbitals
 
+from qiskit import transpile
+
 from quimb.tensor.tensor_1d import MatrixProductState, MatrixProductOperator
 
 from .adapt_data import AdaptData
@@ -3727,7 +3729,7 @@ class SampledLinAlgAdapt(LinAlgAdapt):
 
         super().__init__(*args, **kvargs)
 
-        assert self.pool.name == "no_z_pauli_pool"
+        # assert self.pool.name == "no_z_pauli_pool"
         assert not self.orb_opt
 
     def save_hamiltonian(self, hamiltonian):
@@ -3742,20 +3744,30 @@ class SampledLinAlgAdapt(LinAlgAdapt):
         orb_params=None,
     ):
         from scipy.sparse import issparse
-        from qiskit.primitives import Estimator
+        from qiskit_ibm_runtime import EstimatorV2 as Estimator
+        from qiskit_ibm_runtime.fake_provider import FakeFez
 
-        ket = self.get_state(coefficients, indices, ref_state)
+        backend = FakeFez()
 
-        if issparse(ket):
-            ket = ket.toarray()
+        if self.data is None:
+            ket = self.get_state(coefficients, indices, ref_state)
+
+            if issparse(ket):
+                ket = ket.toarray()
+            else:
+                ket = np.array(ket)
+
+            ket = ket[:, 0]
+            qc = QuantumCircuit(self.n)
+            qc.initialize(ket)
+            qc = transpile(qc, basis_gates=['u1', 'u2', 'u3', 'cx'])
         else:
-            ket = np.array(ket)
+            data = self.data
+            qc = data.get_circuit(self.pool,include_ref=True)
 
-        ket = ket[:, 0]
-        qc = QuantumCircuit(self.molecule.n_qubits)
-        qc.initialize(ket)
-        estimator = Estimator()
-        job = estimator.run(qc, observable, shots=self.shots)
+        estimator = Estimator(backend)
+        estimator.options.default_shots = self.shots
+        job = estimator.run([(qc, observable)])
         result = job.result()
         exp_value = result.values[0]
 
