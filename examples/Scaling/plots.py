@@ -58,7 +58,7 @@ def _(mo):
 
 @app.cell
 def _(os, pd):
-    data_dir = "xxz_scaling_results"
+    data_dir = "xxz_new_new"
     data_files = os.listdir(data_dir)
     xxz_dfs = []
     for f in data_files:
@@ -80,7 +80,7 @@ def _(df_xxz, np):
 
 @app.cell
 def _(chi_vals, df_xxz, l_vals, np, plt):
-    fig_xxz, ax_xxz = plt.subplots(len(l_vals), len(chi_vals), figsize=(len(l_vals) * 2., len(chi_vals) * 2.5))
+    fig_xxz, ax_xxz = plt.subplots(len(l_vals), len(chi_vals), figsize=(len(l_vals) * 4.0, len(chi_vals) * 2.0))
 
     for i, l in enumerate(np.unique(df_xxz["N"])):
         for j, chi in enumerate(np.unique(df_xxz["chi"])):
@@ -97,7 +97,7 @@ def _(chi_vals, df_xxz, l_vals, np, plt):
 
     fig_xxz.tight_layout()
     # plt.show()
-    plt.savefig("xxz_scaling.pdf")
+    plt.savefig("xxz_scaling_new.pdf")
     return
 
 
