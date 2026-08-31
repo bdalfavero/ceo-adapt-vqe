@@ -13,7 +13,7 @@ NUM_ITER = 10
 
 
 class ScalingResult:
-    def __init__(self, N: int, chi: int, exact_energy: float, times: list[float], energies: list[float]):
+    def __init__(self, N: int, chi: int, exact_energy: float, times: list[float], energies: list[float], bonds: list[int]):
         assert len(times) == len(energies)
 
         self._N = N
@@ -21,6 +21,7 @@ class ScalingResult:
         self._exact_energy = exact_energy
         self._times = np.array(times)
         self._energies = np.array(energies)
+        self._bonds = np.array(bonds)
 
     def to_dataframe(self) -> pd.DataFrame:
         abs_errors = np.abs(self._energies - self._exact_energy)
@@ -30,7 +31,8 @@ class ScalingResult:
             data={
                 "iteration": np.array(range(self._times.size)),
                 "time": self._times, "energy": self._energies,
-                "abs_error": abs_errors, "rel_error": rel_errors
+                "abs_error": abs_errors, "rel_error": rel_errors,
+                "bond_dim": self._bonds
             }
         )
         df["N"] = self._N
@@ -69,14 +71,18 @@ def run_n_chi(N: int, chi: int, num_iter: int=NUM_ITER):
 
     adapt_energies = []
     adapt_times = []
+    adapt_bonds = []
     for _ in range(num_iter):
         start_time = perf_counter_ns()
         tn_adapt.run_iteration()
         end_time = perf_counter_ns()
         elapsed_time = end_time - start_time
+        state = tn_adapt.compute_state()
+        max_bond = state.max_bond()
         adapt_energies.append(tn_adapt.energy)
         adapt_times.append(elapsed_time)
-    return ScalingResult(N, chi, dmrg_energy, adapt_times, adapt_energies)
+        adapt_bonds.append(max_bond)
+    return ScalingResult(N, chi, dmrg_energy, adapt_times, adapt_energies, adapt_bonds)
 
 
 if __name__ == "__main__":
