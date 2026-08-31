@@ -14,7 +14,10 @@ NUM_ITER = 10
 
 
 class ScalingResult:
-    def __init__(self, N: int, chi: int, exact_energy: float, times: list[float], energies: list[float], bonds: list[int]):
+    def __init__(
+        self, N: int, chi: int, exact_energy: float, times: list[float], energies: list[float],
+        bonds: list[int], depths: list[int]
+    ):
         assert len(times) == len(energies)
 
         self._N = N
@@ -23,6 +26,7 @@ class ScalingResult:
         self._times = np.array(times)
         self._energies = np.array(energies)
         self._bonds = np.array(bonds)
+        self._depths = np.array(depths)
 
     def to_dataframe(self) -> pd.DataFrame:
         abs_errors = np.abs(self._energies - self._exact_energy)
@@ -33,7 +37,7 @@ class ScalingResult:
                 "iteration": np.array(range(self._times.size)),
                 "time": self._times, "energy": self._energies,
                 "abs_error": abs_errors, "rel_error": rel_errors,
-                "bond_dim": self._bonds
+                "bond_dim": self._bonds, "depths": self._depths
             }
         )
         df["N"] = self._N
@@ -42,7 +46,7 @@ class ScalingResult:
         return df
 
 
-def run_n_chi(N: int, chi: int, num_iter: int=NUM_ITER):
+def run_n_chi(N: int, chi: int, num_iter: int=NUM_ITER, output_interval=None):
     new_l = N
     j_xy = 1
     j_z = 1
@@ -73,20 +77,29 @@ def run_n_chi(N: int, chi: int, num_iter: int=NUM_ITER):
     adapt_energies = []
     adapt_times = []
     adapt_bonds = []
-    for _ in range(num_iter):
+    adapt_depths = []
+    for i in range(num_iter):
         start_time = perf_counter_ns()
         tn_adapt.run_iteration()
         end_time = perf_counter_ns()
         elapsed_time = end_time - start_time
         state = tn_adapt.compute_state()
         max_bond = state.max_bond()
+        data = my_adapt.data
+        qc = data.get_circuit(
+            pool, indices=tn_adapt.indices, coefficients=tn_adapt.coefficients, include_ref=True
+        )
+
+        if output_interval is not None:
+            if (i % output_interval == 0) or i == num_iter - 1:
+                dump(qc, f"xxz_circuit_N{N}_chi{chi}_iter{i}.qasm")
+
         adapt_energies.append(tn_adapt.energy)
         adapt_times.append(elapsed_time)
         adapt_bonds.append(max_bond)
+        adapt_depths.append(qc.depth())
 
-    data = my_adapt.data
-    qc = data.get_circuit(pool,include_ref=True)
-    return ScalingResult(N, chi, dmrg_energy, adapt_times, adapt_energies, adapt_bonds), qc
+    return ScalingResult(N, chi, dmrg_energy, adapt_times, adapt_energies, adapt_bonds, adapt_depths)
 
 
 if __name__ == "__main__":
@@ -94,10 +107,12 @@ if __name__ == "__main__":
     parser.add_argument("N", type=int, help="Number of spins.")
     parser.add_argument("chi", type=int, help="MPS bond dimension.")
     parser.add_argument("--num-iter", type=int, default=100, help="Number of ADAPT iterations.")
+    parser.add_argument("--output-interval", type=int, default=10, help="Interval for writing circuits to files.")
     args = parser.parse_args()
     N = args.N
     chi = args.chi
     num_iter = args.num_iter
+    output_interval = args.output_interval
     assert N > 0
     assert chi > 0
 
@@ -141,7 +156,6 @@ if __name__ == "__main__":
     source_ops = [pool.operators[index].operator for index in ixs]
     
     print(f"N={N} chi={chi}")
-    result, qc = run_n_chi(N, chi, num_iter=num_iter)
+    result = run_n_chi(N, chi, num_iter=num_iter, output_interval=output_interval)
     df = result.to_dataframe()
     df.to_csv(f"xxz_results_N{N}_chi{chi}.csv", index=False)
-    dump(qc, f"xxz_circuit_N{N}_chi{chi}.qasm")
