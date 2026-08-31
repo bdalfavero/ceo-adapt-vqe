@@ -101,6 +101,40 @@ def _(chi_vals, df_xxz, l_vals, np, plt):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## MPS to circuit
+    """)
+    return
+
+
+@app.cell
+def _(pd):
+    df_mps = pd.read_csv("mps_to_circuit_results.csv")
+    print(df_mps.head())
+    return (df_mps,)
+
+
+@app.cell
+def _(df_mps, plt):
+    fig_mps, ax_mps = plt.subplots()
+    ax_right_mps = ax_mps.twinx()
+    ax_mps.plot(df_mps["chi"], df_mps["error"], color="blue")
+    ax_right_mps.plot(df_mps["chi"], df_mps["depths"], color="red")
+    ax_mps.set_yscale("log")
+    ax_mps.set_ylabel("Absolute Energy Error", color="blue")
+    ax_right_mps.set_ylabel("Circuit Depth", color="red")
+    # plt.show()
+    plt.savefig("hchain_mps_circuits_N8.pdf")
+    return
+
+
+@app.cell
+def _():
+    return
+
+
 @app.cell
 def _():
     return
