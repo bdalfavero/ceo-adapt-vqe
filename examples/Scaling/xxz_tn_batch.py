@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from openfermion import MolecularData
 from openfermionpyscf import run_pyscf
+from qiskit.qasm2 import dump
 from adaptvqe.algorithms.adapt_vqe import TensorNetAdapt, LinAlgAdapt
 from adaptvqe.pools import DVE_CEO, FullPauliPool, TiledPauliPool
 from adaptvqe.hamiltonians import XXZHamiltonian
@@ -82,7 +83,10 @@ def run_n_chi(N: int, chi: int, num_iter: int=NUM_ITER):
         adapt_energies.append(tn_adapt.energy)
         adapt_times.append(elapsed_time)
         adapt_bonds.append(max_bond)
-    return ScalingResult(N, chi, dmrg_energy, adapt_times, adapt_energies, adapt_bonds)
+
+    data = my_adapt.data
+    qc = data.get_circuit(pool,include_ref=True)
+    return ScalingResult(N, chi, dmrg_energy, adapt_times, adapt_energies, adapt_bonds), qc
 
 
 if __name__ == "__main__":
@@ -137,6 +141,7 @@ if __name__ == "__main__":
     source_ops = [pool.operators[index].operator for index in ixs]
     
     print(f"N={N} chi={chi}")
-    result = run_n_chi(N, chi, num_iter=num_iter)
+    result, qc = run_n_chi(N, chi, num_iter=num_iter)
     df = result.to_dataframe()
     df.to_csv(f"xxz_results_N{N}_chi{chi}.csv", index=False)
+    dump(qc, f"xxz_circuit_N{N}_chi{chi}.qasm")
