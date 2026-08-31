@@ -11,43 +11,6 @@ from adaptvqe.hamiltonians import XXZHamiltonian
 MAX_MPO_BOND = 200
 NUM_ITER = 10
 
-max_mpo_bond = 100
-dmrg_mps_bond = 10
-adapt_mps_bond = 5
-l = 4
-
-j_xy = 1
-j_z = 1
-h = XXZHamiltonian(j_xy, j_z, l, diag_mode="quimb", max_mpo_bond=max_mpo_bond, max_mps_bond=dmrg_mps_bond)
-dmrg_energy = h.ground_energy
-print(f"Got DMRG energy {dmrg_energy:4.5e}")
-pool = FullPauliPool(n=l, max_mpo_bond=max_mpo_bond)
-
-# Run 200 iterations of ADAPT-VQE for small problem instance, selecting randomly among degenerate gradients.
-# Form a list of all unique operators ever selected for this small instance.
-ixs = []
-for _ in range(100):
-    my_adapt = TensorNetAdapt(
-        pool=pool,
-        custom_hamiltonian=h,
-        verbose=False,
-        threshold=10**-5,
-        max_adapt_iter=5,
-        max_opt_iter=10000,
-        sel_criterion="gradient",
-        recycle_hessian=False,
-        rand_degenerate=True,
-        max_mpo_bond=100,
-        max_mps_bond = 20
-    )
-    my_adapt.run()
-    data = my_adapt.data
-    for i in data.result.ansatz.indices:
-        if i not in ixs:
-            ixs.append(i)
-
-print(f"Pool will be tiled from {len(ixs)} ops")
-source_ops = [pool.operators[index].operator for index in ixs]
 
 class ScalingResult:
     def __init__(self, N: int, chi: int, exact_energy: float, times: list[float], energies: list[float]):
@@ -120,13 +83,54 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("N", type=int, help="Number of spins.")
     parser.add_argument("chi", type=int, help="MPS bond dimension.")
+    parser.add_argument("--num-iter", type=int, default=100, help="Number of ADAPT iterations.")
     args = parser.parse_args()
     N = args.N
     chi = args.chi
+    num_iter = args.num_iter
     assert N > 0
     assert chi > 0
+
+    # Build tiled pool.
+    max_mpo_bond = 100
+    dmrg_mps_bond = 10
+    adapt_mps_bond = 5
+    l = 4
+
+    j_xy = 1
+    j_z = 1
+    h = XXZHamiltonian(j_xy, j_z, l, diag_mode="quimb", max_mpo_bond=max_mpo_bond, max_mps_bond=dmrg_mps_bond)
+    dmrg_energy = h.ground_energy
+    print(f"Got DMRG energy {dmrg_energy:4.5e}")
+    pool = FullPauliPool(n=l, max_mpo_bond=max_mpo_bond)
+
+    # Run 200 iterations of ADAPT-VQE for small problem instance, selecting randomly among degenerate gradients.
+    # Form a list of all unique operators ever selected for this small instance.
+    ixs = []
+    for _ in range(100):
+        my_adapt = TensorNetAdapt(
+            pool=pool,
+            custom_hamiltonian=h,
+            verbose=False,
+            threshold=10**-5,
+            max_adapt_iter=5,
+            max_opt_iter=10000,
+            sel_criterion="gradient",
+            recycle_hessian=False,
+            rand_degenerate=True,
+            max_mpo_bond=100,
+            max_mps_bond = 20
+        )
+        my_adapt.run()
+        data = my_adapt.data
+        for i in data.result.ansatz.indices:
+            if i not in ixs:
+                ixs.append(i)
+
+    print(f"Pool will be tiled from {len(ixs)} ops")
+    source_ops = [pool.operators[index].operator for index in ixs]
     
     print(f"N={N} chi={chi}")
-    result = run_n_chi(N, chi, num_iter=50)
+    result = run_n_chi(N, chi, num_iter=num_iter)
     df = result.to_dataframe()
     df.to_csv(f"xxz_results_N{N}_chi{chi}.csv", index=False)
