@@ -85,9 +85,9 @@ def run_n_chi(N: int, chi: int, num_iter: int=NUM_ITER, output_interval=None):
         elapsed_time = end_time - start_time
         state = tn_adapt.compute_state()
         max_bond = state.max_bond()
-        data = my_adapt.data
+        data = tn_adapt.data
         qc = data.get_circuit(
-            pool, indices=tn_adapt.indices, coefficients=tn_adapt.coefficients, include_ref=True
+            tiled_pool, indices=tn_adapt.indices, coefficients=tn_adapt.coefficients, include_ref=True
         )
 
         if output_interval is not None:
