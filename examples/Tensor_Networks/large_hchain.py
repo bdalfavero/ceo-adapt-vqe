@@ -10,9 +10,10 @@ from adaptvqe.pools import DVE_CEO, GSD, PairedGSD
 MAX_MPO_BOND = 200
 
 if __name__ == "__main__":
-    N = 16
+    # N = 16
     # N = 4
-    chi = 50
+    N = 8
+    chi = 15
     num_iter = 5
 
     r = 1.5
