@@ -174,3 +174,5 @@ __marimo__/
 profile_results
 *.pkl
 *.pdf
+*.qasm
+*.tar.gz
