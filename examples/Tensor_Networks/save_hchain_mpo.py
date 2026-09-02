@@ -1,3 +1,4 @@
+import argparse
 import pickle
 import openfermion as of
 from openfermion import MolecularData
@@ -5,9 +6,12 @@ from openfermionpyscf import run_pyscf
 from adaptvqe.tensor_helpers import qubop_to_mpo
 
 if __name__ == "__main__":
-    N = 16
-    max_mpo_bond = int(1e6)
-    num_iter = 5
+    parser = argparse.ArgumentParser()
+    parser.add_argument("N", type=int, help="Number of sites.")
+    parser.add_argument("--max-mpo-bond", type=int, default=int(1e6), help="Maximum bond dimension of MPO.")
+    args = parser.parse_args()
+    N = args.N
+    max_mpo_bond = args.max_mpo_bond
 
     r = 1.5
     geometry = [['H', [0, 0, i * r]] for i in range(N)]
