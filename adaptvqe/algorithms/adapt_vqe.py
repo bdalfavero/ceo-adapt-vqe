@@ -3748,6 +3748,9 @@ class SampledLinAlgAdapt(LinAlgAdapt):
         from qiskit_aer.primitives import Estimator
         from qiskit_ibm_runtime.fake_provider import FakeFez
 
+        print("self.energy_meas =", self.energy_meas)
+        print(f"Observable =", observable)
+
         backend = FakeFez()
 
         try:
@@ -3784,14 +3787,14 @@ class SampledLinAlgAdapt(LinAlgAdapt):
             # Gradient observable for this operator has not been created yet
 
             operator = self.pool.get_q_op(op_index)
-            operator = to_qiskit_operator(operator, little_endian=False)
+            operator = to_qiskit_operator(operator, n=self.hamiltonian.num_qubits, little_endian=False)
             observable = 2 * self.hamiltonian @ operator
             # observable = self.hamiltonian @ operator - operator @ self.hamiltonian
             self.pool.store_grad_meas(op_index, observable)
 
         gradient = self.evaluate_observable(observable, coefficients, indices)
 
-        return gradient
+        return gradient.real
 
     def estimate_gradients(
         self, coefficients=None, indices=None, method="psr", dx=10**-8
