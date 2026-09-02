@@ -3786,14 +3786,11 @@ class SampledLinAlgAdapt(LinAlgAdapt):
             # Gradient observable for this operator has not been created yet
 
             operator = self.pool.get_q_op(op_index)
-            print("operator =", operator)
             operator = to_qiskit_operator(operator, n=self.hamiltonian.num_qubits, little_endian=False)
-            print("operator =", operator)
             # observable = 2 * self.hamiltonian @ operator
             observable = self.hamiltonian @ operator - operator @ self.hamiltonian
             self.pool.store_grad_meas(op_index, observable)
 
-        print(f"in eval_candidate_gradient, observable =", observable)
         gradient = self.evaluate_observable(observable, coefficients, indices)
 
         return gradient.real
