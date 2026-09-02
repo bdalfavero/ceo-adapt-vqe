@@ -3746,10 +3746,10 @@ class SampledLinAlgAdapt(LinAlgAdapt):
         from scipy.sparse import issparse
         # from qiskit_ibm_runtime import EstimatorV2 as Estimator
         from qiskit_aer.primitives import Estimator
+        from qiskit.primitives import StatevectorEstimator
         from qiskit_ibm_runtime.fake_provider import FakeFez
 
-        print("self.energy_meas =", self.energy_meas)
-        print(f"Observable =", observable)
+        print(f"observable =", observable)
 
         backend = FakeFez()
 
@@ -3770,12 +3770,12 @@ class SampledLinAlgAdapt(LinAlgAdapt):
             # qc = transpile(qc, basis_gates=['u1', 'u2', 'u3', 'cx'])
 
         # estimator = Estimator(backend)
-        estimator = Estimator()
-        estimator.options.default_shots = self.shots
-        # job = estimator.run([(qc, observable)])
-        job = estimator.run(qc, observable)
+        # estimator = Estimator()
+        # estimator.options.default_shots = self.shots
+        estimator = StatevectorEstimator()
+        job = estimator.run([(qc, observable)])
         result = job.result()
-        exp_value = result.values[0]
+        exp_value = result[0].data.evs.tolist()
 
         return exp_value
 
@@ -3787,11 +3787,14 @@ class SampledLinAlgAdapt(LinAlgAdapt):
             # Gradient observable for this operator has not been created yet
 
             operator = self.pool.get_q_op(op_index)
+            print(f"in eval_candidate_gradient, operator =", operator)
             operator = to_qiskit_operator(operator, n=self.hamiltonian.num_qubits, little_endian=False)
+            print(f"in eval_candidate_gradient, after conversion operator =", operator)
             observable = 2 * self.hamiltonian @ operator
             # observable = self.hamiltonian @ operator - operator @ self.hamiltonian
             self.pool.store_grad_meas(op_index, observable)
 
+        print(f"in eval_candidate_gradient, observable =", observable)
         gradient = self.evaluate_observable(observable, coefficients, indices)
 
         return gradient.real
@@ -3849,6 +3852,11 @@ class SampledLinAlgAdapt(LinAlgAdapt):
             gradients.append(g)
 
         return gradients
+
+    def perform_sim_transform(self, orb_params):
+        if len(orb_params) != 0:
+            warn(f"perform_sim_transform called with non-empty parameters {orb_params}.")
+        pass
 
     @property
     def name(self):
