@@ -3749,8 +3749,6 @@ class SampledLinAlgAdapt(LinAlgAdapt):
         from qiskit.primitives import StatevectorEstimator
         from qiskit_ibm_runtime.fake_provider import FakeFez
 
-        print(f"observable =", observable)
-
         backend = FakeFez()
 
         try:
@@ -3767,15 +3765,16 @@ class SampledLinAlgAdapt(LinAlgAdapt):
             ket = ket[:, 0]
             qc = QuantumCircuit(self.n)
             qc.initialize(ket)
-            # qc = transpile(qc, basis_gates=['u1', 'u2', 'u3', 'cx'])
 
-        # estimator = Estimator(backend)
-        # estimator = Estimator()
-        # estimator.options.default_shots = self.shots
-        estimator = StatevectorEstimator()
-        job = estimator.run([(qc, observable)])
-        result = job.result()
-        exp_value = result[0].data.evs.tolist()
+        if np.sum(np.abs(observable.simplify().coeffs)) >= 1e-16:
+            estimator = StatevectorEstimator()
+            job = estimator.run([(qc, observable.simplify())])
+            result = job.result()
+            exp_value = result[0].data.evs.tolist()
+        else:
+            # Sometimes we pass in an observable that is just 0. becuase
+            # the pool operator commutes with the Hamiltonian.
+            exp_value = 0.
 
         return exp_value
 
@@ -3787,11 +3786,11 @@ class SampledLinAlgAdapt(LinAlgAdapt):
             # Gradient observable for this operator has not been created yet
 
             operator = self.pool.get_q_op(op_index)
-            print(f"in eval_candidate_gradient, operator =", operator)
+            print("operator =", operator)
             operator = to_qiskit_operator(operator, n=self.hamiltonian.num_qubits, little_endian=False)
-            print(f"in eval_candidate_gradient, after conversion operator =", operator)
-            observable = 2 * self.hamiltonian @ operator
-            # observable = self.hamiltonian @ operator - operator @ self.hamiltonian
+            print("operator =", operator)
+            # observable = 2 * self.hamiltonian @ operator
+            observable = self.hamiltonian @ operator - operator @ self.hamiltonian
             self.pool.store_grad_meas(op_index, observable)
 
         print(f"in eval_candidate_gradient, observable =", observable)
