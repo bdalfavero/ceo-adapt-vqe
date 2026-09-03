@@ -90,14 +90,19 @@ def run_n_chi(N: int, chi: int, num_iter: int=NUM_ITER, output_interval=None):
             tiled_pool, indices=tn_adapt.indices, coefficients=tn_adapt.coefficients, include_ref=True
         )
 
-        if output_interval is not None:
-            if (i % output_interval == 0) or i == num_iter - 1:
-                dump(qc, f"xxz_circuit_N{N}_chi{chi}_iter{i}.qasm")
-
         adapt_energies.append(tn_adapt.energy)
         adapt_times.append(elapsed_time)
         adapt_bonds.append(max_bond)
         adapt_depths.append(qc.depth())
+
+        if output_interval is not None:
+            if ((i + 1) % output_interval == 0) or i == num_iter - 1:
+                dump(qc, f"xxz_circuit_N{N}_chi{chi}_iter{i}.qasm")
+                result = ScalingResult(
+                    N, chi, dmrg_energy, adapt_times, adapt_energies, adapt_bonds, adapt_depths
+                )
+                df = result.to_dataframe()
+                df.to_csv(f"xxz_results_N{N}_chi{chi}_iter{i}.csv", index=False)
 
     return ScalingResult(N, chi, dmrg_energy, adapt_times, adapt_energies, adapt_bonds, adapt_depths)
 
