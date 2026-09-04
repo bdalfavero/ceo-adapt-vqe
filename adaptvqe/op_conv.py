@@ -148,14 +148,21 @@ def to_qiskit_term(of_term, n, switch_endianness):
 
         previous_index = qubit_index
 
-    id_count = (n - previous_index - 1)
-    if switch_endianness:
-        for _ in range(id_count):
-            qiskit_op = I ^ qiskit_op
+    if qiskit_op is None:
+        # The passed of operator was the identity.
+        qiskit_op = SparsePauliOp(["I" * n])
     else:
-        for _ in range(id_count):
-            qiskit_op = qiskit_op ^ I
+        id_count = (n - previous_index - 1)
+        if switch_endianness:
+            for _ in range(id_count):
+                qiskit_op = I ^ qiskit_op
+        else:
+            for _ in range(id_count):
+                qiskit_op = qiskit_op ^ I
 
+    if not isinstance(qiskit_op, SparsePauliOp):
+        qiskit_op = SparsePauliOp(qiskit_op)
+    
     qiskit_op = coefficient * qiskit_op
 
     return qiskit_op
