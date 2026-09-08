@@ -71,6 +71,7 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         skip_converged_rename=False,
         mpo_filename=None,
         n_screening_workers=1,
+        n_optim_workers=1,
     ):
         """
         Arguments:
@@ -146,6 +147,7 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         self.skip_converged_rename = skip_converged_rename
         self.mpo_filename = mpo_filename
         self.n_screening_workers = n_screening_workers
+        self.n_optim_workers = n_optim_workers
 
         # Attributes describing type of CEO pool, when applicable. The algorithm runs differently for each of them
         self.dvg = "DVG" in self.pool.name
@@ -853,7 +855,7 @@ class AdaptVQE(metaclass=abc.ABCMeta):
             gradient (float): the approximation to the gradient
         """
 
-        if method != "fd":
+        if method not in ("fd", "psr"):
             raise ValueError(f"Method {method} is not supported.")
 
         if indices is None:
@@ -864,23 +866,38 @@ class AdaptVQE(metaclass=abc.ABCMeta):
 
         assert len(coefficients) == len(indices)
 
-        coefficients_plus = copy(coefficients)
-        orb_params_plus = copy(orb_params)
+        if method == "fd":
+            coefficients_plus = copy(coefficients)
+            orb_params_plus = copy(orb_params)
 
-        if operator_pos < self.orb_opt_dim:
-            # We want the gradient of an orbital optimization parameter. Coefficients stay the same
-            orb_params_plus[operator_pos] += dx
-        else:
-            # We want the gradient of an ansatz parameter. Orbital parameters stay the same
-            coefficients_plus[operator_pos - self.orb_opt_dim] += dx
+            if operator_pos < self.orb_opt_dim:
+                orb_params_plus[operator_pos] += dx
+            else:
+                coefficients_plus[operator_pos - self.orb_opt_dim] += dx
 
-        energy = self.evaluate_energy(
-            coefficients, indices, orb_params=orb_params, ref_state=ref_state
-        )
-        energy_plus = self.evaluate_energy(
-            coefficients_plus, indices, orb_params=orb_params_plus
-        )
-        gradient = (energy_plus - energy) / dx
+            energy = self.evaluate_energy(
+                coefficients, indices, orb_params=orb_params, ref_state=ref_state
+            )
+            energy_plus = self.evaluate_energy(
+                coefficients_plus, indices, orb_params=orb_params_plus
+            )
+            gradient = (energy_plus - energy) / dx
+
+        else:  # psr
+            # Parameter-shift rule: gradient = E(θ + π/4) - E(θ - π/4).
+            # Exact (no step-size error) for operators whose generators have eigenvalues ±1,
+            # i.e. qubit excitation operators (A² = -I → iA has eigenvalues ±1).
+            # Not defined for orbital parameters.
+            if operator_pos < self.orb_opt_dim:
+                raise NotImplementedError("PSR is not implemented for orbital parameters.")
+            pos = operator_pos - self.orb_opt_dim
+            coefficients_plus  = copy(coefficients)
+            coefficients_minus = copy(coefficients)
+            coefficients_plus[pos]  += np.pi / 4
+            coefficients_minus[pos] -= np.pi / 4
+            energy_plus  = self.evaluate_energy(coefficients_plus,  indices, orb_params=orb_params)
+            energy_minus = self.evaluate_energy(coefficients_minus, indices, orb_params=orb_params)
+            gradient = energy_plus - energy_minus
 
         return gradient
 
@@ -1210,7 +1227,7 @@ class AdaptVQE(metaclass=abc.ABCMeta):
             gradient (float): the approximation to the gradient
         """
 
-        if method != "fd":
+        if method not in ("fd", "psr"):
             raise NotImplementedError
 
         if indices is None:
@@ -1227,17 +1244,41 @@ class AdaptVQE(metaclass=abc.ABCMeta):
             assert len(coefficients) == len(indices)
             orb_params = None
 
-        gradients = []
-        for operator_pos in range(self.orb_opt_dim + len(coefficients)):
-            gradient = self.estimate_gradient(
-                operator_pos=operator_pos,
-                coefficients=coefficients,
-                indices=indices,
-                method="fd",
-                dx=dx,
-                orb_params=orb_params,
-            )
-            gradients.append(gradient)
+        positions = list(range(self.orb_opt_dim + len(coefficients)))
+
+        if self.n_optim_workers == 1 or len(positions) < 2:
+            gradients = [
+                self.estimate_gradient(
+                    operator_pos=pos,
+                    coefficients=coefficients,
+                    indices=indices,
+                    method=method,
+                    dx=dx,
+                    orb_params=orb_params,
+                )
+                for pos in positions
+            ]
+        else:
+            # Each estimate_gradient call is independent: it evaluates evaluate_energy with
+            # explicit coefficients, so compute_state builds a fresh local state and makes
+            # no writes to shared instance attributes. Thread-safe for both subclasses.
+            # Note: numpy/quimb use multi-threaded BLAS; set OMP_NUM_THREADS=1 to avoid
+            # oversubscription when n_optim_workers is large.
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=self.n_optim_workers) as executor:
+                futures = [
+                    executor.submit(
+                        self.estimate_gradient,
+                        operator_pos=pos,
+                        coefficients=coefficients,
+                        indices=indices,
+                        method=method,
+                        dx=dx,
+                        orb_params=orb_params,
+                    )
+                    for pos in positions
+                ]
+                gradients = [f.result() for f in futures]
 
         return gradients
 
@@ -3189,10 +3230,13 @@ class LinAlgAdapt(AdaptVQE):
             gradients (list): the gradient vector
         """
 
-        if method == "fd":
-            # Finite differences are implemented in parent class
+        if method == "fd" or (method == "an" and self.n_optim_workers > 1):
+            # n_optim_workers > 1: fall through to the base-class per-coordinate loop,
+            # which fans out across threads. Use PSR (exact, no step-size error) when the
+            # caller asked for "an"; use FD only when explicitly requested.
+            fallback = "psr" if method == "an" else "fd"
             return super().estimate_gradients(
-                coefficients=coefficients, indices=indices, method=method, dx=dx
+                coefficients=coefficients, indices=indices, method=fallback, dx=dx
             )
 
         if method != "an":
@@ -4212,10 +4256,13 @@ class TensorNetAdapt(AdaptVQE):
             gradients (list): the gradient vector
         """
 
-        if method == "fd":
-            # Finite differences are implemented in parent class
+        if method == "fd" or (method == "an" and self.n_optim_workers > 1):
+            # n_optim_workers > 1: fall through to the base-class per-coordinate loop,
+            # which fans out across threads. Use PSR (exact, no step-size error) when the
+            # caller asked for "an"; use FD only when explicitly requested.
+            fallback = "psr" if method == "an" else "fd"
             return super().estimate_gradients(
-                coefficients=coefficients, indices=indices, method=method, dx=dx
+                coefficients=coefficients, indices=indices, method=fallback, dx=dx
             )
 
         if method != "an":
