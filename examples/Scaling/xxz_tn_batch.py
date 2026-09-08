@@ -70,7 +70,7 @@ def run_n_chi(N: int, chi: int, num_iter: int=NUM_ITER, output_interval=None):
         recycle_hessian=False,
         rand_degenerate=True,
         max_mpo_bond=max_mpo_bond,
-        max_mps_bond=adapt_mps_bond
+        max_mps_bond=chi
     )
     tn_adapt.initialize()
 
