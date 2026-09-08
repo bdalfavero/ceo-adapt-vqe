@@ -14,7 +14,7 @@ if __name__ == "__main__":
     # N = 4
     N = 8
     chi = 15
-    num_iter = 5
+    num_iter = 10
 
     r = 1.5
     geometry = [['H', [0, 0, i * r]] for i in range(N)]
@@ -46,30 +46,39 @@ if __name__ == "__main__":
         max_mpo_bond=MAX_MPO_BOND,
         max_mps_bond=chi,
         skip_converged_rename=True,
-        mpo_filename="hchain_mpo_N8_chi1000000.pkl"
+        mpo_filename=f"hchain_mpo_N{N}_chi1000000.pkl"
     )
-    print("Initializing...")
-    start_time = perf_counter_ns()
-    my_adapt.initialize()
-    end_time = perf_counter_ns()
-    elapsed = abs(end_time - start_time)
-    print(f"Initialized in {elapsed:5.4e} ns.")
+    # print("Initializing...")
+    # start_time = perf_counter_ns()
+    # my_adapt.initialize()
+    # end_time = perf_counter_ns()
+    # elapsed = abs(end_time - start_time)
+    # print(f"Initialized in {elapsed:5.4e} ns.")
 
-    energies = []
-    times = []
-    for _ in range(num_iter):
-        start_time = perf_counter_ns()
-        my_adapt.run_iteration()
-        end_time = perf_counter_ns()
-        elapsed_time = float(abs(end_time - start_time))
-        energies.append(my_adapt.energy)
-        times.append(elapsed_time)
+    my_adapt.run()
+    
+    # energies = []
+    # times = []
+    # for _ in range(num_iter):
+    #     start_time = perf_counter_ns()
+    #     my_adapt.run_iteration()
+    #     end_time = perf_counter_ns()
+    #     elapsed_time = float(abs(end_time - start_time))
+    #     energies.append(my_adapt.energy)
+    #     times.append(elapsed_time)
+    
+    data = my_adapt.data
+    indices = data.evolution.indices
+    coefficients = data.evolution.coefficients
+    energies = data.evolution.energies
     
     output_dict = {
+        "N": N,
         "hf_energy": hf_energy,
         "exact_energy": exact_energy,
         "energies": energies,
-        "times": times
+        "indices": indices,
+        "coefficients": coefficients
     }
 
     with open("large_hchain_results.pkl", "wb") as f:
