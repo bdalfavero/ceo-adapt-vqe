@@ -22,6 +22,8 @@ import openfermion as of
 from openfermion import get_sparse_operator, count_qubits
 from openfermion.transforms import get_fermion_operator, freeze_orbitals
 
+from qiskit import transpile
+
 from quimb.tensor.tensor_1d import MatrixProductState, MatrixProductOperator
 
 from .adapt_data import AdaptData
@@ -3737,7 +3739,7 @@ class SampledLinAlgAdapt(LinAlgAdapt):
 
         super().__init__(*args, **kvargs)
 
-        assert self.pool.name == "no_z_pauli_pool"
+        # assert self.pool.name == "no_z_pauli_pool"
         assert not self.orb_opt
 
     def save_hamiltonian(self, hamiltonian):
@@ -3752,22 +3754,37 @@ class SampledLinAlgAdapt(LinAlgAdapt):
         orb_params=None,
     ):
         from scipy.sparse import issparse
-        from qiskit.primitives import Estimator
+        # from qiskit_ibm_runtime import EstimatorV2 as Estimator
+        from qiskit_aer.primitives import Estimator
+        from qiskit.primitives import StatevectorEstimator
+        from qiskit_ibm_runtime.fake_provider import FakeFez
 
-        ket = self.get_state(coefficients, indices, ref_state)
+        backend = FakeFez()
 
-        if issparse(ket):
-            ket = ket.toarray()
+        try:
+            data = self.data
+            qc = data.get_circuit(self.pool,include_ref=True)
+        except AttributeError:
+            ket = self.get_state(coefficients, indices, ref_state)
+
+            if issparse(ket):
+                ket = ket.toarray()
+            else:
+                ket = np.array(ket)
+
+            ket = ket[:, 0]
+            qc = QuantumCircuit(self.n)
+            qc.initialize(ket)
+
+        if np.sum(np.abs(observable.simplify().coeffs)) >= 1e-16:
+            estimator = StatevectorEstimator()
+            job = estimator.run([(qc, observable.simplify())])
+            result = job.result()
+            exp_value = result[0].data.evs.tolist()
         else:
-            ket = np.array(ket)
-
-        ket = ket[:, 0]
-        qc = QuantumCircuit(self.molecule.n_qubits)
-        qc.initialize(ket)
-        estimator = Estimator()
-        job = estimator.run(qc, observable, shots=self.shots)
-        result = job.result()
-        exp_value = result.values[0]
+            # Sometimes we pass in an observable that is just 0. becuase
+            # the pool operator commutes with the Hamiltonian.
+            exp_value = 0.
 
         return exp_value
 
@@ -3779,14 +3796,14 @@ class SampledLinAlgAdapt(LinAlgAdapt):
             # Gradient observable for this operator has not been created yet
 
             operator = self.pool.get_q_op(op_index)
-            operator = to_qiskit_operator(operator, little_endian=False)
-            observable = 2 * self.hamiltonian @ operator
-            # observable = self.hamiltonian @ operator - operator @ self.hamiltonian
+            operator = to_qiskit_operator(operator, n=self.hamiltonian.num_qubits, little_endian=False)
+            # observable = 2 * self.hamiltonian @ operator
+            observable = self.hamiltonian @ operator - operator @ self.hamiltonian
             self.pool.store_grad_meas(op_index, observable)
 
         gradient = self.evaluate_observable(observable, coefficients, indices)
 
-        return gradient
+        return gradient.real
 
     def estimate_gradients(
         self, coefficients=None, indices=None, method="psr", dx=10**-8
@@ -3841,6 +3858,11 @@ class SampledLinAlgAdapt(LinAlgAdapt):
             gradients.append(g)
 
         return gradients
+
+    def perform_sim_transform(self, orb_params):
+        if len(orb_params) != 0:
+            warn(f"perform_sim_transform called with non-empty parameters {orb_params}.")
+        pass
 
     @property
     def name(self):

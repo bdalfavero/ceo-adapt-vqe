@@ -16,6 +16,7 @@ from openfermion import (
     jordan_wigner,
 )
 import qiskit
+from qiskit.quantum_info.operators import SparsePauliOp
 from qiskit.qasm3 import dumps
 
 # todo: use stable version of qiskit only
@@ -134,7 +135,10 @@ def to_qiskit_term(of_term, n, switch_endianness):
                 qiskit_op = new_ops ^ qiskit_op
         else:
             if id_count > 0:
-                new_ops = (I ** id_count) ^ to_qiskit_pauli(pauli)
+                # new_ops = (I ** id_count) ^ to_qiskit_pauli(pauli)
+                new_ops = to_qiskit_pauli(pauli)
+                for _ in range(id_count):
+                    new_ops =  I ^ new_ops
             else:
                 new_ops = to_qiskit_pauli(pauli)
             if qiskit_op is None:
@@ -144,14 +148,21 @@ def to_qiskit_term(of_term, n, switch_endianness):
 
         previous_index = qubit_index
 
-    id_count = (n - previous_index - 1)
-    if switch_endianness:
-        for _ in range(id_count):
-            qiskit_op = I ^ qiskit_op
+    if qiskit_op is None:
+        # The passed of operator was the identity.
+        qiskit_op = SparsePauliOp(["I" * n])
     else:
-        for _ in range(id_count):
-            qiskit_op = qiskit_op ^ I
+        id_count = (n - previous_index - 1)
+        if switch_endianness:
+            for _ in range(id_count):
+                qiskit_op = I ^ qiskit_op
+        else:
+            for _ in range(id_count):
+                qiskit_op = qiskit_op ^ I
 
+    if not isinstance(qiskit_op, SparsePauliOp):
+        qiskit_op = SparsePauliOp(qiskit_op)
+    
     qiskit_op = coefficient * qiskit_op
 
     return qiskit_op
@@ -188,9 +199,9 @@ def to_qiskit_operator(of_operator, n=None, little_endian=True):
     for term in of_operator.get_operators():
         qiskit_term = to_qiskit_term(term, n, little_endian)
         if qiskit_operator is None:
-            qiskit_operator = qiskit_term
+            qiskit_operator = SparsePauliOp(qiskit_term)
         else:
-            qiskit_operator += qiskit_term
+            qiskit_operator += SparsePauliOp(qiskit_term)
 
     return qiskit_operator
 

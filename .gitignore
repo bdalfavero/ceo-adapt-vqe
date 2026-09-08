@@ -175,4 +175,5 @@ profile_results
 *.pkl
 *.pdf
 *.qasm
+*.csv
 *.tar.gz
