@@ -34,6 +34,7 @@ from ..minimize import minimize_bfgs
 from ..pools import ImplementationType
 from ..utils import bfgs_update
 from ..tensor_helpers import computational_basis_mps, qubop_to_mpo
+from quimb.tensor.tensor_1d_compress import tensor_network_1d_compress_direct
 
 class AdaptVQE(metaclass=abc.ABCMeta):
     """
@@ -3872,8 +3873,17 @@ class SampledLinAlgAdapt(LinAlgAdapt):
 class TensorNetAdapt(AdaptVQE):
     """ADAPT VQE with tensor networks for the states and operators."""
 
-    def __init__(self, *args, **kvargs):
-
+    def __init__(self, *args, compress_grad_mpos=False, use_H_ket_screening=True, **kvargs):
+        """
+        Additional keyword arguments:
+            compress_grad_mpos (bool): If True, SVD-compress the H@A MPO for each pool operator
+                down to max_mpo_bond after computing it, before caching. Reduces the cost of
+                every subsequent MPO-MPS contraction during screening at the cost of a small
+                approximation in the gradient observable. Default False (exact).
+            use_H_ket_screening (bool): If True, compute H|ψ⟩ once per screening sweep and
+                evaluate all pool gradients as <H_ψ|A_i|ψ>, avoiding the large-bond-dim H@A
+                MPOs entirely. Default True.
+        """
         kvargs["pool"].imp_type = ImplementationType.TENSORS
 
         super().__init__(*args, **kvargs)
@@ -3883,6 +3893,9 @@ class TensorNetAdapt(AdaptVQE):
 
         self.state = self.tn_ref_state
         self.ref_state = self.tn_ref_state
+        self.compress_grad_mpos = compress_grad_mpos
+        self.use_H_ket_screening = use_H_ket_screening
+        self._H_ket = None  # set during rank_gradients when use_H_ket_screening=True
 
     def evaluate_observable(
         self,
@@ -4253,19 +4266,42 @@ class TensorNetAdapt(AdaptVQE):
           the current state
         """
 
-        measurement = self.pool.get_grad_meas(index)
+        if self._H_ket is not None:
+            # Fast path: H|ψ⟩ was precomputed for this screening sweep in rank_gradients.
+            # Gradient = 2 Re⟨ψ|H A_i|ψ⟩ = 2 Re⟨H_ψ|A_i|ψ⟩.
+            # A_i MPOs have much smaller bond dim than H@A_i MPOs, so the contraction is cheaper.
+            ket = self.get_state(coefficients, indices)
+            operator = self.pool.get_mpo_op(index, len(self.hamiltonian_mpo.tensors))
+            A_ket = operator.apply(ket)
+            return 2 * (self._H_ket.H @ A_ket).real
 
-        if measurement is None:
-            # Gradient observable for this operator has not been created yet
+        observable = self.pool.get_grad_meas(index)
 
+        if observable is None:
             operator = self.pool.get_mpo_op(index, len(self.hamiltonian_mpo.tensors))
             if len(operator.tensors) != len(self.hamiltonian_mpo.tensors):
                 raise AssertionError(f"Observable has {len(operator.tensors)} tensors and H has {len(self.hamiltonian_mpo.tensors)}")
             observable = 2 * self.hamiltonian_mpo.apply(operator)
+            if self.compress_grad_mpos:
+                tensor_network_1d_compress_direct(observable, max_bond=self.max_mpo_bond, inplace=True)
+            self.pool.store_grad_meas(index, observable)
 
         gradient = self.evaluate_observable(observable, coefficients, indices)
 
         return gradient
+
+    def rank_gradients(self, coefficients=None, indices=None, silent=False):
+        """
+        Override to optionally precompute H|ψ⟩ once and share it across all pool gradient
+        evaluations (use_H_ket_screening=True), then delegate to the parent implementation.
+        """
+        if self.use_H_ket_screening:
+            ket = self.get_state(coefficients, indices)
+            self._H_ket = self.hamiltonian_mpo.apply(ket)
+        try:
+            return super().rank_gradients(coefficients, indices, silent)
+        finally:
+            self._H_ket = None
 
     def perform_sim_transform(self, orb_params):
         """
