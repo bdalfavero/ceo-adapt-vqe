@@ -6,16 +6,18 @@ import openfermion as of
 from openfermion import MolecularData
 from openfermionpyscf import run_pyscf
 from adaptvqe.algorithms.adapt_vqe import TensorNetAdapt, LinAlgAdapt
+from adaptvqe.hamiltonians import FermionicHamiltonian
 from adaptvqe.pools import DVE_CEO, GSD, PairedGSD
 from adaptvqe.utils import hamiltonian_from_fcidump
 from adaptvqe.tensor_helpers import qubop_to_mpo
 
+DMRG_MPS_BOND = 25
 MAX_MPO_BOND = 200
-NUM_ITER = 5
+NUM_ITER = 10
 
 if __name__ == "__main__":
     chi = 15
-    N = 2
+    N = 4
     r = 1.5
     geometry = [['H', [0, 0, i * r]] for i in range(N)]
     basis = 'sto-3g'
@@ -39,7 +41,11 @@ if __name__ == "__main__":
         h1e, eri, norb, nelec,
         ms=spin
     )
-    h = hamiltonian_from_fcidump(fcidump_fname)
+    h_int, norb, nelec = hamiltonian_from_fcidump(fcidump_fname)
+    h = FermionicHamiltonian(
+        h_int, f"H{N}", nelec, diag_mode="quimb",
+        max_mps_bond=DMRG_MPS_BOND, max_mpo_bond=MAX_MPO_BOND
+    )
 
     mpo_fname = f"hchain_mpo_N{N}_chi{MAX_MPO_BOND}.pkl" 
     if not isfile(mpo_fname):
@@ -56,10 +62,11 @@ if __name__ == "__main__":
     pool = GSD(mol)
     my_adapt = TensorNetAdapt(
         pool=pool,
-        molecule=mol,
+        custom_hamiltonian=h,
+        # molecule=mol,
         max_adapt_iter=NUM_ITER + 1,
         recycle_hessian=True,
-        tetris=True,
+        # tetris=True,
         verbose=True,
         threshold=0.1,
         max_mpo_bond=MAX_MPO_BOND,
