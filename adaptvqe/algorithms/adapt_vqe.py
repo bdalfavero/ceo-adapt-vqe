@@ -70,6 +70,7 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         max_mps_bond=None,
         skip_converged_rename=False,
         mpo_filename=None,
+        n_screening_workers=1,
     ):
         """
         Arguments:
@@ -144,6 +145,7 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         self.max_mps_bond = max_mps_bond
         self.skip_converged_rename = skip_converged_rename
         self.mpo_filename = mpo_filename
+        self.n_screening_workers = n_screening_workers
 
         # Attributes describing type of CEO pool, when applicable. The algorithm runs differently for each of them
         self.dvg = "DVG" in self.pool.name
@@ -500,6 +502,27 @@ class AdaptVQE(metaclass=abc.ABCMeta):
 
         return state
 
+    def _map_gradients(self, index_list, coefficients, indices):
+        """
+        Compute eval_candidate_gradient for each index in index_list, optionally in parallel.
+
+        When n_screening_workers > 1 the evaluations are fanned out across a thread pool.
+        Each call is independent (reads shared state, writes only to its own pool slot), so
+        threading is safe.  Because numpy/quimb already use multi-threaded BLAS internally,
+        setting OMP_NUM_THREADS=1 (or equivalent) before launching the process is recommended
+        when using more than one worker, to avoid thread oversubscription.
+        """
+        if self.n_screening_workers == 1 or len(index_list) < 2:
+            return [self.eval_candidate_gradient(i, coefficients, indices) for i in index_list]
+
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=self.n_screening_workers) as executor:
+            futures = [
+                executor.submit(self.eval_candidate_gradient, i, coefficients, indices)
+                for i in index_list
+            ]
+            return [f.result() for f in futures]
+
     def rank_gradients(self, coefficients=None, indices=None, silent=False):
         """
         Selects the operators that currently have the largest gradients. The number of selected operators depends on
@@ -531,18 +554,21 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         if self.verbose and not silent:
             print("\nNon-Zero Gradients (tolerance E-8):")
 
-        # If we're using a CEO pool: Compute QE (parent) gradients
+        # CEO pools: parent gradients must be known before penalising child operators.
         parent_gradients = {}
-        for index in self.pool.parent_range:
+        parent_index_list = list(self.pool.parent_range)
+        if parent_index_list:
+            parent_grads = self._map_gradients(parent_index_list, coefficients, indices)
+            parent_gradients = dict(zip(parent_index_list, parent_grads))
 
-            gradient = self.eval_candidate_gradient(index, coefficients, indices)
-            parent_gradients[index] = gradient
+        # All pool operators (covers the full range 0..pool.size-1).
+        pool_index_list = list(chain(
+            range(self.pool.parent_range.start),
+            range(self.pool.parent_range.start, self.pool.size),
+        ))
+        pool_grads = self._map_gradients(pool_index_list, coefficients, indices)
 
-        # Compute actual pool gradients (singles/doubles)
-        for index in chain(range(self.pool.parent_range.start),
-                           range(self.pool.parent_range.start,self.pool.size)):
-
-            gradient = self.eval_candidate_gradient(index, coefficients, indices)
+        for index, gradient in zip(pool_index_list, pool_grads):
             total_norm += gradient**2
 
             nnz_g_parents = []
@@ -551,7 +577,7 @@ class AdaptVQE(metaclass=abc.ABCMeta):
             if parents is not None:
                 nnz_g_parents = [p_index for p_index in parents if parent_gradients[p_index]]
 
-            gradient = self.penalize_gradient(gradient, index, silent,nnz_g_parents)
+            gradient = self.penalize_gradient(gradient, index, silent, nnz_g_parents)
 
             if np.abs(gradient) < 10**-8:
                 continue
