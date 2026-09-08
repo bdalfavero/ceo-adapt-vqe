@@ -12,7 +12,7 @@ def _():
     import matplotlib.pyplot as plt
     import seaborn as sns
 
-    return np, os, pd, plt
+    return np, os, pd, plt, sns
 
 
 @app.cell
@@ -130,8 +130,46 @@ def _(df_mps, plt):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Larger scaling study
+    """)
+    return
+
+
 @app.cell
-def _():
+def _(pd):
+    datafiles = [
+        "xxz_bond/xxz_results_N40_chi1000_iter239.csv",
+        "xxz_bond/xxz_results_N50_chi1000_iter269.csv",
+        "xxz_bond/xxz_results_N60_chi1000_iter179.csv",
+        "xxz_bond/xxz_results_N80_chi1000_iter139.csv",
+        "xxz_bond/xxz_results_N100_chi1000_iter139.csv"
+    ]
+    dfs_large = []
+    for f in datafiles:
+        dfs_large.append(pd.read_csv(f))
+    df_large = pd.concat(dfs_large)
+    print(df_large.head())
+    return (df_large,)
+
+
+@app.cell
+def _(df_large, plt, sns):
+    fig, ax = plt.subplots(1, 4, figsize=(10., 4.))
+    sns.lineplot(data=df_large, x="iteration", y="abs_error", hue="N", ax=ax[0])
+    sns.lineplot(data=df_large, x="iteration", y="time", hue="N", ax=ax[1])
+    sns.lineplot(data=df_large, x="iteration", y="bond_dim", hue="N", ax=ax[2])
+    sns.lineplot(data=df_large, x="iteration", y="depths", hue="N", ax=ax[3])
+    ax[0].set_yscale("log")
+    ax[0].set_ylabel("Absolute energy error")
+    ax[1].set_ylabel("Iteration time (ns)")
+    ax[2].set_ylabel("Bond dimension")
+    ax[3].set_ylabel("Circuit depth")
+    fig.tight_layout()
+    # plt.show()
+    plt.savefig("scaling_study_results.pdf")
     return
 
 
