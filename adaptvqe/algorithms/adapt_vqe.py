@@ -3873,7 +3873,8 @@ class SampledLinAlgAdapt(LinAlgAdapt):
 class TensorNetAdapt(AdaptVQE):
     """ADAPT VQE with tensor networks for the states and operators."""
 
-    def __init__(self, *args, compress_grad_mpos=False, use_H_ket_screening=True, **kvargs):
+    def __init__(self, *args, compress_grad_mpos=False, use_H_ket_screening=True,
+                 screening_mps_bond=None, **kvargs):
         """
         Additional keyword arguments:
             compress_grad_mpos (bool): If True, SVD-compress the H@A MPO for each pool operator
@@ -3883,6 +3884,10 @@ class TensorNetAdapt(AdaptVQE):
             use_H_ket_screening (bool): If True, compute H|ψ⟩ once per screening sweep and
                 evaluate all pool gradients as <H_ψ|A_i|ψ>, avoiding the large-bond-dim H@A
                 MPOs entirely. Default True.
+            screening_mps_bond (int or None): If set, compress the current MPS state to this
+                bond dimension before each gradient screening sweep. The optimization step always
+                uses the full max_mps_bond. Lower values speed up screening at the cost of
+                approximate gradient rankings. Default None (use full bond dimension).
         """
         kvargs["pool"].imp_type = ImplementationType.TENSORS
 
@@ -3895,6 +3900,7 @@ class TensorNetAdapt(AdaptVQE):
         self.ref_state = self.tn_ref_state
         self.compress_grad_mpos = compress_grad_mpos
         self.use_H_ket_screening = use_H_ket_screening
+        self.screening_mps_bond = screening_mps_bond
         self._H_ket = None  # set during rank_gradients when use_H_ket_screening=True
 
     def evaluate_observable(
@@ -4292,16 +4298,29 @@ class TensorNetAdapt(AdaptVQE):
 
     def rank_gradients(self, coefficients=None, indices=None, silent=False):
         """
-        Override to optionally precompute H|ψ⟩ once and share it across all pool gradient
-        evaluations (use_H_ket_screening=True), then delegate to the parent implementation.
+        Override to optionally:
+          - compress self.state to screening_mps_bond before the sweep (restored after)
+          - precompute H|ψ⟩ once for all pool gradient evaluations (use_H_ket_screening)
+        Both operate on the (possibly compressed) screening state; optimization always uses
+        the full-bond-dim self.state since it is restored in the finally block.
         """
+        original_state = None
+        if self.screening_mps_bond is not None and coefficients is None and indices is None:
+            original_state = self.state
+            compressed = self.state.copy()
+            tensor_network_1d_compress_direct(compressed, max_bond=self.screening_mps_bond, inplace=True)
+            self.state = compressed
+
         if self.use_H_ket_screening:
             ket = self.get_state(coefficients, indices)
             self._H_ket = self.hamiltonian_mpo.apply(ket)
+
         try:
             return super().rank_gradients(coefficients, indices, silent)
         finally:
             self._H_ket = None
+            if original_state is not None:
+                self.state = original_state
 
     def perform_sim_transform(self, orb_params):
         """
