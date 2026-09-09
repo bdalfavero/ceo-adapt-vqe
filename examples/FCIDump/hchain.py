@@ -17,7 +17,7 @@ NUM_ITER = 10
 
 if __name__ == "__main__":
     chi = 15
-    N = 4
+    N = 8
     r = 1.5
     geometry = [['H', [0, 0, i * r]] for i in range(N)]
     basis = 'sto-3g'
@@ -46,6 +46,7 @@ if __name__ == "__main__":
         h_int, f"H{N}", nelec, diag_mode="quimb",
         max_mps_bond=DMRG_MPS_BOND, max_mpo_bond=MAX_MPO_BOND
     )
+    print(f"DMRG energy: {h.ground_energy}")
 
     mpo_fname = f"hchain_mpo_N{N}_chi{MAX_MPO_BOND}.pkl" 
     if not isfile(mpo_fname):
