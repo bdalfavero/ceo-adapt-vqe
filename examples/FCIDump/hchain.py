@@ -16,8 +16,8 @@ MAX_MPO_BOND = 200
 NUM_ITER = 10
 
 if __name__ == "__main__":
-    chi = 15
-    N = 8
+    chi = 25
+    N = 12
     r = 1.5
     geometry = [['H', [0, 0, i * r]] for i in range(N)]
     basis = 'sto-3g'
@@ -84,14 +84,16 @@ if __name__ == "__main__":
     
     output_dict = {
         "N": N,
+        "chi": chi,
         "hf_energy": hf_energy,
         "exact_energy": exact_energy,
+        "dmrg_energy": h.ground_energy,
         "energies": energies,
         "indices": indices,
         "coefficients": coefficients
     }
 
-    with open("hchain_results.pkl", "wb") as f:
+    with open(f"hchain_results_N{N}.pkl", "wb") as f:
         pickle.dump(output_dict, f)
 
     print(exact_energy, energies[-1])
