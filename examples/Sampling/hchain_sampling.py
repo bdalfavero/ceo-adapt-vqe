@@ -1,3 +1,5 @@
+import pickle as pkl
+
 import numpy as np
 from scipy.sparse.linalg import expm, expm_multiply
 
@@ -32,7 +34,7 @@ my_adapt = SampledLinAlgAdapt(
     pool=pool,
     verbose=False,
     threshold=10**-5,
-    max_adapt_iter=10,
+    max_adapt_iter=20,
     max_opt_iter=10000,
     sel_criterion="gradient",
     recycle_hessian=False,
@@ -51,3 +53,11 @@ print("\nEnergy from circuit: ", energy)
 fci_err = np.abs(exact_energy - energy)
 print(f"FCI error = {fci_err:5.4e}")
 assert np.abs(energy-data.result.energy) < 10**-6
+
+energies = data.evolution.energies
+out = {
+    "energies": energies,
+    "exact_energy": exact_energy
+}
+with open("hchain_results.pkl", "wb") as f:
+    pkl.dump(out, f)
