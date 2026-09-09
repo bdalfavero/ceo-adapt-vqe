@@ -24,12 +24,6 @@ if __name__ == "__main__":
 
     h_int, norb, nelec = hamiltonian_from_fcidump(fcidump_fname)
     print(f"Read Hamiltonian with {norb} orbitals and {nelec} electrons.")
-    h = FermionicHamiltonian(
-        h_int, "product", nelec, diag_mode="quimb",
-        max_mps_bond=DMRG_MPS_BOND, max_mpo_bond=MAX_MPO_BOND
-    )
-    print(f"DMRG energy: {h.ground_energy}")
-
     mpo_fname = f"product_mpo_chi{MAX_MPO_BOND}.pkl" 
     if not isfile(mpo_fname):
         if isinstance(h_int, of.QubitOperator):
@@ -40,6 +34,13 @@ if __name__ == "__main__":
 
         with open(mpo_fname, "wb") as f:
             pickle.dump(hamiltonian_mpo, f)
+    print(f"Wrote Hamiltonian to {mpo_fname}")
+
+    h = FermionicHamiltonian(
+        h_int, "product", nelec, diag_mode="quimb",
+        max_mps_bond=DMRG_MPS_BOND, max_mpo_bond=MAX_MPO_BOND
+    )
+    print(f"DMRG energy: {h.ground_energy}")
 
     pool = GSD(n=norb)
     my_adapt = TensorNetAdapt(
