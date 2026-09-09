@@ -8,7 +8,7 @@ from adaptvqe.hamiltonians import XXZHamiltonian
 from adaptvqe.tensor_helpers import qubop_to_mpo
 
 MAX_MPO_BOND = 1000
-NUM_ITER = 5
+NUM_ITER = 20
 
 if __name__ == "__main__":
     N = 4
