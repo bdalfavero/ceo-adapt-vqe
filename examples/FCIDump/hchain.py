@@ -31,24 +31,6 @@ if __name__ == "__main__":
     print(f"hf_energy = {hf_energy}")
     print(f"exact_energy = {exact_energy}")
 
-    fcidump_fname = f"H{N}.fcidump"
-    h1e = mol.one_body_integrals
-    eri = mol.two_body_integrals  # in chemists' notation (pq|rs)
-    norb = h1e.shape[0]
-    nelec = mol.n_electrons
-    spin = mol.multiplicity - 1  # 2S = multiplicity - 1
-    fcidump.from_integrals(
-        fcidump_fname,
-        h1e, eri, norb, nelec,
-        ms=spin
-    )
-    h_int, norb, nelec = hamiltonian_from_fcidump(fcidump_fname)
-    h = FermionicHamiltonian(
-        h_int, f"H{N}", nelec, diag_mode="quimb",
-        max_mps_bond=DMRG_MPS_BOND, max_mpo_bond=MAX_MPO_BOND
-    )
-    print(f"DMRG energy: {h.ground_energy}")
-
     mpo_fname = f"hchain_mpo_N{N}_chi{MAX_MPO_BOND}.pkl" 
     if not isfile(mpo_fname):
         hamiltonian = mol.get_molecular_hamiltonian()
@@ -61,11 +43,31 @@ if __name__ == "__main__":
         with open(mpo_fname, "wb") as f:
             pickle.dump(hamiltonian_mpo, f)
 
+    fcidump_fname = f"H{N}.fcidump"
+    h1e = mol.one_body_integrals
+    eri = mol.two_body_integrals  # in chemists' notation (pq|rs)
+    norb = h1e.shape[0]
+    nelec = mol.n_electrons
+    spin = mol.multiplicity - 1  # 2S = multiplicity - 1
+    fcidump.from_integrals(
+        fcidump_fname,
+        h1e, eri, norb, nelec,
+        ms=spin,
+        nuc=mol.nuclear_repulsion
+    )
+    h_int, norb, nelec = hamiltonian_from_fcidump(fcidump_fname)
+    h = FermionicHamiltonian(
+        h_int, f"H{N}", nelec, diag_mode="quimb",
+        mpo_filename=mpo_fname,
+        max_mps_bond=DMRG_MPS_BOND, max_mpo_bond=MAX_MPO_BOND
+    )
+    print(f"DMRG energy: {h.ground_energy}")
+
     pool = GSD(mol)
-    my_adapt = LinAlgAdapt(
+    my_adapt = TensorNetAdapt(
         pool=pool,
-        # custom_hamiltonian=h,
-        molecule=mol,
+        custom_hamiltonian=h,
+        # molecule=mol,
         max_adapt_iter=NUM_ITER + 1,
         recycle_hessian=True,
         # tetris=True,

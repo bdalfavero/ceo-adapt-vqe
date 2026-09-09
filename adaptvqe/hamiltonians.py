@@ -1,4 +1,5 @@
 from warnings import warn
+import pickle
 import numpy as np
 from scipy.sparse import csc_matrix
 
@@ -305,7 +306,7 @@ class FermionicHamiltonian:
     """
     Class for molecular Hamiltonians represented by Openfermion FermionOperators
     """
-    def __init__(self, operator,description,n_electrons,n=None, diag_mode: str="exact", **kwargs):
+    def __init__(self, operator,description,n_electrons,n=None, diag_mode: str="exact", mpo_filename=None, **kwargs):
         """
         Initialize class instance.
 
@@ -320,6 +321,7 @@ class FermionicHamiltonian:
 
         assert diag_mode in ["exact", "quimb"]
         self._diag_mode = diag_mode
+        self.mpo_filename = mpo_filename
 
         if self._diag_mode == "quimb":
             self._max_mps_bond = kwargs["max_mps_bond"]
@@ -353,11 +355,15 @@ class FermionicHamiltonian:
                 self._ground_state = ground_state
                 self._ground_energy = ground_energy
             else:
-                if isinstance(self.operator, of.QubitOperator):
-                    ham_mpo = qubop_to_mpo(self.operator, self._max_mpo_bond)
+                if self.mpo_filename is None:
+                    if isinstance(hamiltonian, of.QubitOperator):
+                        ham_mpo = qubop_to_mpo(hamiltonian, self.max_mpo_bond)
+                    else:
+                        ham_jw = of.transforms.jordan_wigner(hamiltonian)
+                        ham_mpo = qubop_to_mpo(ham_jw, self.max_mpo_bond)
                 else:
-                    op_jw = of.transforms.jordan_wigner(self.operator)
-                    ham_mpo = qubop_to_mpo(op_jw, self._max_mpo_bond)
+                    with open(self.mpo_filename, "rb") as f:
+                        ham_mpo = pickle.load(f)
                 dmrg = DMRG(ham_mpo, bond_dims=self._max_mps_bond)
                 converged = dmrg.solve()
                 if not converged:
