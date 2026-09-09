@@ -201,6 +201,31 @@ def ket_to_vector(ket,little_endian=False):
     return state_vector
 
 
+def ket_to_sparse_vector(ket, little_endian=False):
+    """
+    Builds a sparse column vector for a computational basis state without
+    materializing the dense 2^n vector.
+
+    Arguments:
+        ket (list): a list of length n with entries 0 or 1
+        little_endian (bool): whether the input ket is in little endian notation
+
+    Returns:
+        scipy.sparse.csc_matrix: a (2^n, 1) sparse column vector
+    """
+    if little_endian:
+        ket = ket[::-1]
+
+    n = len(ket)
+    dim = 1 << n  # 2^n
+
+    idx = 0
+    for bit in ket:
+        idx = (idx << 1) | int(bit)
+
+    return csc_matrix(([1.0], ([idx], [0])), shape=(dim, 1))
+
+
 def calculate_overlap(state1, state2):
     """
     Calculates the overlap between two states, given their coordinates.

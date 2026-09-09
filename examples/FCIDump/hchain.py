@@ -16,8 +16,8 @@ MAX_MPO_BOND = 200
 NUM_ITER = 10
 
 if __name__ == "__main__":
-    chi = 25
-    N = 12
+    chi = 10
+    N = 4
     r = 1.5
     geometry = [['H', [0, 0, i * r]] for i in range(N)]
     basis = 'sto-3g'
