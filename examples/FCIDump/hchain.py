@@ -17,16 +17,17 @@ NUM_ITER = 10
 
 if __name__ == "__main__":
     chi = 10
-    N = 4
+    N = 2
     r = 1.5
     geometry = [['H', [0, 0, i * r]] for i in range(N)]
     basis = 'sto-3g'
     multiplicity = 1
     charge = 0
     mol = MolecularData(geometry, basis, multiplicity, charge, description=f'H{N}')
-    mol = run_pyscf(mol, run_fci=False, run_ccsd=True, run_scf=True)  # CCSD doesn't work here?
+    mol = run_pyscf(mol, run_fci=True, run_ccsd=True, run_scf=True)  # CCSD doesn't work here?
     hf_energy = mol.hf_energy
-    exact_energy = mol.ccsd_energy
+    # exact_energy = mol.ccsd_energy
+    exact_energy = mol.fci_energy
     print(f"hf_energy = {hf_energy}")
     print(f"exact_energy = {exact_energy}")
 
@@ -61,10 +62,10 @@ if __name__ == "__main__":
             pickle.dump(hamiltonian_mpo, f)
 
     pool = GSD(mol)
-    my_adapt = TensorNetAdapt(
+    my_adapt = LinAlgAdapt(
         pool=pool,
-        custom_hamiltonian=h,
-        # molecule=mol,
+        # custom_hamiltonian=h,
+        molecule=mol,
         max_adapt_iter=NUM_ITER + 1,
         recycle_hessian=True,
         # tetris=True,

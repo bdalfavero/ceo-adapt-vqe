@@ -29,7 +29,7 @@ from quimb.tensor.tensor_1d import MatrixProductState, MatrixProductOperator
 from .adapt_data import AdaptData
 from ..chemistry import chemical_accuracy, get_hf_det, create_spin_adapted_one_body_op
 from ..circuits import prepare_lnn_op, count_lnn_swaps, swap_lnn, get_swaps
-from ..matrix_tools import ket_to_vector
+from ..matrix_tools import ket_to_sparse_vector
 from ..minimize import minimize_bfgs
 from ..pools import ImplementationType
 from ..utils import bfgs_update
@@ -303,9 +303,7 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         # Set the Hartree Fock state as reference
         self.ref_det = get_hf_det(self.molecule.n_electrons, self.n)
 
-        self.sparse_ref_state = csc_matrix(
-            ket_to_vector(self.ref_det), dtype=complex
-        ).transpose()
+        self.sparse_ref_state = ket_to_sparse_vector(self.ref_det).astype(complex)
 
         self.tn_ref_state = computational_basis_mps(self.ref_det)
 
