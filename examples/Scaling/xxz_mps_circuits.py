@@ -28,10 +28,13 @@ if __name__ == "__main__":
 
     backend = FakeFez()
 
+    num_layers = 3
+
     chis = list(range(4, 31, 2))
     energies = []
     depths = []
     errs = []
+    approx_depths = []
     for chi in chis:
         print(f"chi = {chi}")
         dmrg = DMRG(ham_mpo, bond_dims=chi)
@@ -43,12 +46,19 @@ if __name__ == "__main__":
         mps_arrays = mps.arrays
         qc = mps_to_circuit(mps_arrays, method="exact", shape="lpr")
         qc_transpiled = qiskit.transpile(qc, backend=backend)
+        qc_transpiled = qiskit.transpile(qc, backend=backend)
+        qc2 = mps_to_circuit(
+            mps_arrays, method="approximate", shape="lpr",
+            chi_max=chi, compress=True, num_layers=num_layers
+        )
+        qc2_transpiled = qiskit.transpile(qc, backend=backend)
         errs.append(abs(ground_energy - dmrg_energy_large))
         energies.append(ground_energy)
         depths.append(qc_transpiled.depth())
+        approx_depths.append(qc2_transpiled.depth())
 
     output_data = {
-        "chi": chis, "energy": energies, "error": errs, "depths": depths
+        "chi": chis, "energy": energies, "error": errs, "depths": depths, "approx_depths": approx_depths
     }
     df = pd.DataFrame.from_dict(output_data, orient='columns')
     df.to_csv("mps_to_circuit_results.csv", index=False)

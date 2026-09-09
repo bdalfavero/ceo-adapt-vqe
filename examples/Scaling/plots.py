@@ -121,12 +121,14 @@ def _(df_mps, plt):
     fig_mps, ax_mps = plt.subplots()
     ax_right_mps = ax_mps.twinx()
     ax_mps.plot(df_mps["chi"], df_mps["error"], color="blue")
-    ax_right_mps.plot(df_mps["chi"], df_mps["depths"], color="red")
+    ax_right_mps.plot(df_mps["chi"], df_mps["depths"], color="red", linestyle="-", label="Exact")
+    ax_right_mps.plot(df_mps["chi"], df_mps["approx_depths"], color="red", linestyle="--", label="Approximate")
+    ax_right_mps.legend()
     ax_mps.set_yscale("log")
     ax_mps.set_ylabel("Absolute Energy Error", color="blue")
     ax_right_mps.set_ylabel("Circuit Depth", color="red")
-    # plt.show()
-    plt.savefig("hchain_mps_circuits_N8.pdf")
+    plt.show()
+    # plt.savefig("hchain_mps_circuits_N8.pdf")
     return
 
 
