@@ -104,7 +104,7 @@ def _(chi_vals, df_xxz, l_vals, np, plt):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## MPS to circuit
+    ## comp to circuit
     """)
     return
 
@@ -127,6 +127,35 @@ def _(df_mps, plt):
     ax_right_mps.set_ylabel("Circuit Depth", color="red")
     # plt.show()
     plt.savefig("hchain_mps_circuits_N8.pdf")
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Comparison with MPS to circuit
+    """)
+    return
+
+
+@app.cell
+def _(pd):
+    df_comp = pd.read_csv("hchain_adapt_bond_results.csv")
+    print(df_comp.head())
+    return (df_comp,)
+
+
+@app.cell
+def _(df_comp, plt):
+    fig_comp, ax_comp  = plt.subplots()
+    ax_right_comp = ax_comp.twinx()
+    ax_comp.plot(df_comp["chi"], df_comp["error"], color="blue")
+    ax_right_comp.plot(df_comp["chi"], df_comp["depths"], color="red")
+    ax_comp.set_yscale("log")
+    ax_comp.set_ylabel("Absolute Energy Error", color="blue")
+    ax_right_comp.set_ylabel("Circuit Depth", color="red")
+    # plt.show()
+    plt.savefig("hchain_adapt_circuits_N8.pdf")
     return
 
 
