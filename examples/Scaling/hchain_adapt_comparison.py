@@ -27,34 +27,37 @@ if __name__ == "__main__":
     ham_mpo = qubop_to_mpo(hamiltonian, MAX_MPO_BOND)
     print(f"FCI energy {exact_energy:5.4e}")
 
-    chis = list(range(4, 21, 2))
-    # chis = list(range(4, 6, 2))
+    chi = 31
+    
     energies = []
     depths = []
     errs = []
-    for chi in chis:
-        my_adapt = TensorNetAdapt(
-            pool=pool,
-            molecule=mol,
-            max_adapt_iter=NUM_ITER,
-            recycle_hessian=True,
-            tetris=True,
-            verbose=True,
-            threshold=0.1,
-            max_mpo_bond=MAX_MPO_BOND,
-            max_mps_bond=chi,
-            skip_converged_rename=True
-        )
-        my_adapt.run()
+    my_adapt = TensorNetAdapt(
+        pool=pool,
+        molecule=mol,
+        max_adapt_iter=NUM_ITER,
+        recycle_hessian=True,
+        tetris=True,
+        verbose=True,
+        threshold=0.1,
+        max_mpo_bond=MAX_MPO_BOND,
+        max_mps_bond=chi,
+        skip_converged_rename=True
+    )
+    for _ in range(NUM_ITER):
+        my_adapt.initialize()
+        my_adapt.run_iteration()
         data = my_adapt.data
-        energy = data.evolution.energies[-1]
-        qc = data.get_circuit(pool,include_ref=True)
-        energies.append(energy)
-        errs.append(abs(energy - exact_energy))
+        qc = data.get_circuit(
+            pool, indices=my_adapt.indices, coefficients=my_adapt.coefficients, include_ref=True
+        )
+        energies.append(my_adapt.energy)
+        errs.append(abs(my_adapt.energy - exact_energy))
         depths.append(qc.depth())
 
+
     output_data = {
-        "chi": chis, "energy": energies, "error": errs, "depths": depths
+        "chi": chi, "energy": energies, "error": errs, "depths": depths
     }
     df = pd.DataFrame.from_dict(output_data, orient='columns')
     df.to_csv("hchain_adapt_bond_results.csv", index=False)
