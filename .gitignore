@@ -177,3 +177,4 @@ profile_results
 *.qasm
 *.csv
 *.tar.gz
+*.fcidump
