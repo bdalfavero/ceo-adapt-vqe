@@ -10,7 +10,7 @@ from adaptvqe.hamiltonians import XXZHamiltonian
 from adaptvqe.tensor_helpers import qubop_to_mpo
 
 MAX_MPO_BOND = 1000
-NUM_ITER = 30
+NUM_ITER = 60
 
 if __name__ == "__main__":
     chi_dmrg_large = 1_000
