@@ -46,12 +46,11 @@ if __name__ == "__main__":
         mps_arrays = mps.arrays
         qc = mps_to_circuit(mps_arrays, method="exact", shape="lpr")
         qc_transpiled = qiskit.transpile(qc, backend=backend)
-        qc_transpiled = qiskit.transpile(qc, backend=backend)
         qc2 = mps_to_circuit(
             mps_arrays, method="approximate", shape="lpr",
-            chi_max=chi, compress=True, num_layers=num_layers
+            chi_max=chi, compress=True# , num_layers=num_layers
         )
-        qc2_transpiled = qiskit.transpile(qc, backend=backend)
+        qc2_transpiled = qiskit.transpile(qc2, backend=backend)
         errs.append(abs(ground_energy - dmrg_energy_large))
         energies.append(ground_energy)
         depths.append(qc_transpiled.depth())
