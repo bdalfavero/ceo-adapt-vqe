@@ -1,7 +1,10 @@
+import numpy as np
 import pandas as pd
 from openfermion import MolecularData
 from openfermion.transforms import get_fermion_operator, jordan_wigner
 from openfermionpyscf import run_pyscf
+import qiskit
+from qiskit_ibm_runtime.fake_provider import FakeFez
 from adaptvqe.algorithms.adapt_vqe import TensorNetAdapt, LinAlgAdapt
 from adaptvqe.pools import DVE_CEO
 from adaptvqe.hamiltonians import XXZHamiltonian
@@ -44,16 +47,20 @@ if __name__ == "__main__":
         max_mps_bond=chi,
         skip_converged_rename=True
     )
-    for _ in range(NUM_ITER):
-        my_adapt.initialize()
-        my_adapt.run_iteration()
-        data = my_adapt.data
+    my_adapt.run()
+    data = my_adapt.data
+
+    energies = np.array(data.evolution.energies)
+    errs = np.abs(energies - exact_energy)
+
+    depths = []
+    backend = FakeFez()
+    for coefficients, indices in zip(data.evolution.coefficients, data.evolution.indices):
         qc = data.get_circuit(
-            pool, indices=my_adapt.indices, coefficients=my_adapt.coefficients, include_ref=True
+            pool, indices=indices, coefficients=coefficients, include_ref=True
         )
-        energies.append(my_adapt.energy)
-        errs.append(abs(my_adapt.energy - exact_energy))
-        depths.append(qc.depth())
+        qc_transpiled = qiskit.transpile(qc, backend=backend)
+        depths.append(qc_transpiled.depth())
 
 
     output_data = {
