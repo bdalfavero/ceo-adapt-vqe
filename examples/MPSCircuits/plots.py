@@ -102,7 +102,14 @@ def _(pd):
 
 
 @app.cell
-def _(df_hchain, plt):
+def _(pd):
+    df_hc_ad = pd.read_csv("hchain_adapt_bond_results.csv")
+    print(df_hc_ad.head())
+    return (df_hc_ad,)
+
+
+@app.cell
+def _(df_hc_ad, df_hchain, plt):
     fig_hchain, ax_hchain = plt.subplots(1, 2, figsize=(10, 5))
 
     right_ax_hchain = ax_hchain[0].twinx()
@@ -116,15 +123,15 @@ def _(df_hchain, plt):
     ax_hchain[0].set_xlabel("Bond Dimension")
     ax_hchain[0].set_title("mps-to-circuit")
 
-    # right_ax2 = ax[1].twinx()
-    # ax[1].plot(df_adapt.index, df_adapt["error"], color="blue")
-    # right_ax2.plot(df_adapt.index, df_adapt["depths"], color="red")
-    # # right_ax.legend()
-    # ax[1].set_yscale("log")
-    # ax[1].set_ylabel("Energy Error", color="blue")
-    # right_ax2.set_ylabel("Circuit depth", color="red")
-    # ax[1].set_xlabel("Iteration")
-    # ax[1].set_title(r"ADAPT ($\chi$=32)")
+    right_ax2_hchain = ax_hchain[1].twinx()
+    ax_hchain[1].plot(df_hc_ad.index, df_hc_ad["error"], color="blue")
+    right_ax2_hchain.plot(df_hc_ad.index, df_hc_ad["depths"], color="red")
+    # right_ax2_hchain.legend()
+    ax_hchain[1].set_yscale("log")
+    ax_hchain[1].set_ylabel("Energy Error", color="blue")
+    right_ax2_hchain.set_ylabel("Circuit depth", color="red")
+    ax_hchain[1].set_xlabel("Iteration")
+    ax_hchain[1].set_title(r"ADAPT ($\chi$=100)")
 
     fig_hchain.tight_layout()
     plt.show()
@@ -132,11 +139,11 @@ def _(df_hchain, plt):
 
 
 @app.cell
-def _(df_hchain, plt):
+def _(df_hc_ad, df_hchain, plt):
     # Scatterplot of energy vs. Circuit Depth for both
     fig2_hchain, ax2_hchain = plt.subplots()
     ax2_hchain.scatter(df_hchain["depths"], df_hchain["error"], label="mps-to-circuit")
-    # ax2_hchain.scatter(df_adapt["depths"], df_adapt["error"], label="ADAPT")
+    ax2_hchain.scatter(df_hc_ad["depths"], df_hc_ad["error"], label="ADAPT")
     ax2_hchain.legend()
     ax2_hchain.set_yscale("log")
     # ax2_hchain.set_xscale("log")

@@ -8,7 +8,7 @@ from adaptvqe.hamiltonians import XXZHamiltonian
 from adaptvqe.tensor_helpers import qubop_to_mpo
 
 MAX_MPO_BOND = 1000
-NUM_ITER = 20
+NUM_ITER = 10
 
 if __name__ == "__main__":
     N = 4
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     ham_mpo = qubop_to_mpo(hamiltonian, MAX_MPO_BOND)
     print(f"FCI energy {exact_energy:5.4e}")
 
-    chi = 31
+    chi = 100
     
     energies = []
     depths = []
