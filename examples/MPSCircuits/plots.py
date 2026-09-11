@@ -12,6 +12,14 @@ def _():
     return pd, plt
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## XXZ model
+    """)
+    return
+
+
 @app.cell
 def _(pd):
     df = pd.read_csv("mps_to_circuit_results.csv")
@@ -67,6 +75,73 @@ def _(df, df_adapt, plt):
     # ax2.set_xscale("log")
     ax2.set_ylabel("Energy Error")
     ax2.set_xlabel("Circuit Depth")
+    plt.show()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Hydrogen chains
+    """)
+    return
+
+
+@app.cell
+def _():
+    import marimo as mo
+
+    return (mo,)
+
+
+@app.cell
+def _(pd):
+    df_hchain = pd.read_csv("hchain_mps_to_circuit_results.csv")
+    print(df_hchain.head())
+    return (df_hchain,)
+
+
+@app.cell
+def _(df_hchain, plt):
+    fig_hchain, ax_hchain = plt.subplots(1, 2, figsize=(10, 5))
+
+    right_ax_hchain = ax_hchain[0].twinx()
+    ax_hchain[0].plot(df_hchain["chi"], df_hchain["error"], color="blue")
+    right_ax_hchain.plot(df_hchain["chi"], df_hchain["depths"], color="red", label="Exact")
+    right_ax_hchain.plot(df_hchain["chi"], df_hchain["approx_depths"], linestyle="--", color="red", label="Approximate")
+    right_ax_hchain.legend(loc="center right")
+    ax_hchain[0].set_yscale("log")
+    ax_hchain[0].set_ylabel("Energy Error", color="blue")
+    right_ax_hchain.set_ylabel("Circuit depth", color="red")
+    ax_hchain[0].set_xlabel("Bond Dimension")
+    ax_hchain[0].set_title("mps-to-circuit")
+
+    # right_ax2 = ax[1].twinx()
+    # ax[1].plot(df_adapt.index, df_adapt["error"], color="blue")
+    # right_ax2.plot(df_adapt.index, df_adapt["depths"], color="red")
+    # # right_ax.legend()
+    # ax[1].set_yscale("log")
+    # ax[1].set_ylabel("Energy Error", color="blue")
+    # right_ax2.set_ylabel("Circuit depth", color="red")
+    # ax[1].set_xlabel("Iteration")
+    # ax[1].set_title(r"ADAPT ($\chi$=32)")
+
+    fig_hchain.tight_layout()
+    plt.show()
+    return
+
+
+@app.cell
+def _(df_hchain, plt):
+    # Scatterplot of energy vs. Circuit Depth for both
+    fig2_hchain, ax2_hchain = plt.subplots()
+    ax2_hchain.scatter(df_hchain["depths"], df_hchain["error"], label="mps-to-circuit")
+    # ax2_hchain.scatter(df_adapt["depths"], df_adapt["error"], label="ADAPT")
+    ax2_hchain.legend()
+    ax2_hchain.set_yscale("log")
+    # ax2_hchain.set_xscale("log")
+    ax2_hchain.set_ylabel("Energy Error")
+    ax2_hchain.set_xlabel("Circuit Depth")
     plt.show()
     return
 

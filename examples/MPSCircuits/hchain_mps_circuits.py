@@ -28,7 +28,8 @@ if __name__ == "__main__":
     int_op = mol.get_molecular_hamiltonian()
     hamiltonian = get_fermion_operator(int_op)
     h = jordan_wigner(hamiltonian)
-    ham_mpo = qubop_to_mpo(hamiltonian, MAX_MPO_BOND)
+
+    ham_mpo = qubop_to_mpo(h, MAX_MPO_BOND)
     print(f"FCI energy {exact_energy:5.4e}")
 
     backend = FakeFez()
@@ -45,6 +46,7 @@ if __name__ == "__main__":
         if not converged:
             print("DMRG did not converge!")
         ground_energy = dmrg.energy.real
+        print(f"ground_energy = {ground_energy}")
         mps = dmrg.state
         mps_arrays = mps.arrays
         qc = mps_to_circuit(mps_arrays, method="exact", shape="lpr")
