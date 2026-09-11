@@ -47,7 +47,8 @@ if __name__ == "__main__":
 
     h = FermionicHamiltonian(
         h_int, "product", nelec, diag_mode="quimb",
-        max_mps_bond=chi_mpo, max_mpo_bond=chi_mpo
+        max_mps_bond=chi_mpo, max_mpo_bond=chi_mpo,
+        mpo_filename=mpo_fname
     )
     print(f"DMRG energy: {h.ground_energy}")
 
