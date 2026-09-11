@@ -356,11 +356,11 @@ class FermionicHamiltonian:
                 self._ground_energy = ground_energy
             else:
                 if self.mpo_filename is None:
-                    if isinstance(hamiltonian, of.QubitOperator):
-                        ham_mpo = qubop_to_mpo(hamiltonian, self.max_mpo_bond)
+                    if isinstance(self.operator, of.QubitOperator):
+                        ham_mpo = qubop_to_mpo(self.operator, self._max_mpo_bond)
                     else:
-                        ham_jw = of.transforms.jordan_wigner(hamiltonian)
-                        ham_mpo = qubop_to_mpo(ham_jw, self.max_mpo_bond)
+                        ham_jw = of.transforms.jordan_wigner(self.operator)
+                        ham_mpo = qubop_to_mpo(ham_jw, self._max_mpo_bond)
                 else:
                     with open(self.mpo_filename, "rb") as f:
                         ham_mpo = pickle.load(f)
