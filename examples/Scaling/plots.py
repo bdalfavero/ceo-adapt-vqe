@@ -172,11 +172,11 @@ def _(mo):
 @app.cell
 def _(pd):
     datafiles = [
-        "xxz_bond/xxz_results_N40_chi1000_iter239.csv",
-        "xxz_bond/xxz_results_N50_chi1000_iter269.csv",
-        "xxz_bond/xxz_results_N60_chi1000_iter179.csv",
-        "xxz_bond/xxz_results_N80_chi1000_iter139.csv",
-        "xxz_bond/xxz_results_N100_chi1000_iter139.csv"
+        "xxz_bond/xxz_results_N40_chi1000_iter139.csv",
+        "xxz_bond/xxz_results_N50_chi1000_iter139.csv",
+        "xxz_bond/xxz_results_N60_chi1000_iter119.csv",
+        "xxz_bond/xxz_results_N80_chi1000_iter109.csv",
+        "xxz_bond/xxz_results_N100_chi1000_iter99.csv"
     ]
     dfs_large = []
     for f in datafiles:
