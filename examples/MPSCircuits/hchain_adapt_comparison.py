@@ -11,7 +11,7 @@ from adaptvqe.hamiltonians import XXZHamiltonian
 from adaptvqe.tensor_helpers import qubop_to_mpo
 
 MAX_MPO_BOND = 1000
-NUM_ITER = 10
+NUM_ITER = 100
 
 if __name__ == "__main__":
     N = 4
@@ -42,7 +42,7 @@ if __name__ == "__main__":
         recycle_hessian=True,
         tetris=True,
         verbose=True,
-        threshold=0.1,
+        threshold=0.01,
         max_mpo_bond=MAX_MPO_BOND,
         max_mps_bond=chi,
         skip_converged_rename=True
