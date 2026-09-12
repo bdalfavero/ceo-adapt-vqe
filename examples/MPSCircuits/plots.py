@@ -39,9 +39,12 @@ def _(df, df_adapt, plt):
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
 
     right_ax = ax[0].twinx()
-    ax[0].plot(df["chi"], df["error"], color="blue")
+    ax[0].plot(df["chi"], df["error"], color="blue", linestyle="-", label="DMRG")
+    ax[0].plot(df["chi"], df["exact_error"], color="blue", linestyle="--", label="Exact MPS")
+    ax[0].plot(df["chi"], df["approx_error"], color="blue", linestyle="-.", label="Approximate MPS")
     right_ax.plot(df["chi"], df["depths"], color="red", label="Exact")
     right_ax.plot(df["chi"], df["approx_depths"], linestyle="--", color="red", label="Approximate")
+    ax[0].legend(loc="upper right")
     right_ax.legend(loc="center right")
     ax[0].set_yscale("log")
     ax[0].set_ylabel("Energy Error", color="blue")

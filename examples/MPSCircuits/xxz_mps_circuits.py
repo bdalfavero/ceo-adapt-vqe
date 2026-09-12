@@ -18,7 +18,8 @@ def circuit_energy(mpo, circuit, chi):
     ckt_qasm = dumps(circuit)
     circuit = qtn.CircuitMPS.from_openqasm2_str(ckt_qasm, max_bond=chi)
     final_mps = circuit.psi
-    return (final_mps.H @ mpo @ final_mps).real
+    # return (final_mps.H @ mpo @ final_mps).real
+    return (final_mps.H @ final_mps.gate_with_mpo(mpo)).real
 
 
 if __name__ == "__main__":
@@ -67,8 +68,8 @@ if __name__ == "__main__":
         qc2_transpiled = qiskit.transpile(qc2, backend=backend)
 
         # Simulate the circuits to get their errors.
-        exact_energy = circuit_energy(ham_mpo, qc_transpiled, 10)
-        approx_energy = circuit_energy(ham_mpo, qc2_transpiled, chi_dmrg_large)
+        exact_energy = circuit_energy(ham_mpo, qc, chi_dmrg_large)
+        approx_energy = circuit_energy(ham_mpo, qc2, chi_dmrg_large)
 
         errs.append(abs(ground_energy - dmrg_energy_large))
         energies.append(ground_energy)
