@@ -38,17 +38,10 @@ if __name__ == "__main__":
 
     backend = FakeFez()
 
-    num_layers = 500
-
+    num_layers_vals = [10, 50, 100]
     chis = list(range(4, 31, 2))
-    energies = []
-    depths = []
-    approx_depths = []
-    errs = []
-    exact_energies = [] # Energies from exact compilation.
-    approx_energies = [] # Energies from approximate compilation.
-    exact_errors = [] # Errors from exact compilation.
-    approx_errors = [] # Errors from approximate compilation.
+
+    records = []
     for chi in chis:
         print(f"chi = {chi}")
         dmrg = DMRG(ham_mpo, bond_dims=chi)
@@ -56,34 +49,27 @@ if __name__ == "__main__":
         if not converged:
             print("DMRG did not converge!")
         ground_energy = dmrg.energy.real
+        dmrg_err = abs(dmrg_energy_large - ground_energy)
+        records.append((chi, "DMRG", 0, ground_energy, dmrg_err, 0, 0))
+
         mps = dmrg.state
         mps_arrays = mps.arrays
-
         qc = mps_to_circuit(mps_arrays, method="exact", shape="lpr")
         qc_transpiled = qiskit.transpile(qc, backend=backend)
-        qc2 = mps_to_circuit(
-            mps_arrays, method="approximate", shape="lpr",
-            chi_max=chi, compress=True, num_layers=num_layers
-        )
-        qc2_transpiled = qiskit.transpile(qc2, backend=backend)
-
-        # Simulate the circuits to get their errors.
         exact_energy = circuit_energy(ham_mpo, qc, chi_dmrg_large)
-        approx_energy = circuit_energy(ham_mpo, qc2, chi_dmrg_large)
+        exact_error = abs(dmrg_energy_large - exact_energy)
+        records.append((chi, "exact", 0, exact_energy, exact_error, qc.depth(), qc_transpiled.depth()))
 
-        errs.append(abs(ground_energy - dmrg_energy_large))
-        energies.append(ground_energy)
-        exact_energies.append(exact_energy)
-        exact_errors.append(abs(exact_energy - dmrg_energy_large))
-        approx_energies.append(approx_energy)
-        approx_errors.append(abs(approx_energy - dmrg_energy_large))
-        depths.append(qc_transpiled.depth())
-        approx_depths.append(qc2_transpiled.depth())
+        for num_layers in num_layers_vals:
+            qc2 = mps_to_circuit(
+                mps_arrays, method="approximate", shape="lpr",
+                chi_max=chi, compress=True, num_layers=num_layers
+            )
+            qc2_transpiled = qiskit.transpile(qc2, backend=backend)
+            approx_energy = circuit_energy(ham_mpo, qc2, chi_dmrg_large)
+            approx_error = abs(dmrg_energy_large - approx_energy)
+            records.append((chi, "approximate", num_layers, approx_energy, approx_error, qc2.depth(), qc2_transpiled.depth()))
 
-    output_data = {
-        "chi": chis, "energy": energies, "error": errs, "depths": depths, "approx_depths": approx_depths,
-        "exact_energy": exact_energies, "exact_error": exact_errors,
-        "approx_energy": approx_energies, "approx_error": approx_errors
-    }
-    df = pd.DataFrame.from_dict(output_data, orient='columns')
+    columns = ["chi", "method", "num_layers", "energy", "error", "pretrans_depth", "posttrans_depth"]
+    df = pd.DataFrame.from_records(records, columns=columns)
     df.to_csv("mps_to_circuit_results.csv", index=False)

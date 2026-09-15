@@ -26,11 +26,12 @@ if __name__ == "__main__":
     print(f"DMRG energy = {exact_energy}")
 
     pool = FullPauliPool(n=h.n)
-    chi = 31
+    chi = 100
 
     backend = FakeFez()
     
     energies = []
+    pretrans_depths = []
     depths = []
     errs = []
     my_adapt = TensorNetAdapt(
@@ -55,11 +56,12 @@ if __name__ == "__main__":
         qc_transpiled = qiskit.transpile(qc, backend=backend)
         energies.append(my_adapt.energy)
         errs.append(abs(my_adapt.energy - exact_energy))
+        pretrans_depths.append(qc.depth())
         depths.append(qc_transpiled.depth())
 
 
     output_data = {
-        "energy": energies, "error": errs, "depths": depths
+        "energy": energies, "error": errs, "depths": depths, "pretrans_depths": pretrans_depths
     }
     df = pd.DataFrame.from_dict(output_data, orient='columns')
     df.to_csv("xxz_adapt_bond_results.csv", index=False)
