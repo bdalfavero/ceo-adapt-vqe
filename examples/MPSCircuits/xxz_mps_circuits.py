@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     backend = FakeFez()
 
-    num_layers_vals = [10, 50, 100]
+    num_layers_vals = [10, 50, 100, 500, 1000]
     chis = list(range(4, 31, 2))
 
     records = []
@@ -63,7 +63,7 @@ if __name__ == "__main__":
         for num_layers in num_layers_vals:
             qc2 = mps_to_circuit(
                 mps_arrays, method="approximate", shape="lpr",
-                chi_max=chi, compress=True, num_layers=num_layers
+                num_layers=num_layers, cutoff=1e-8,
             )
             qc2_transpiled = qiskit.transpile(qc2, backend=backend)
             approx_energy = circuit_energy(ham_mpo, qc2, chi_dmrg_large)

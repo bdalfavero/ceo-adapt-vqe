@@ -36,9 +36,9 @@ def _(pd):
 
 @app.cell
 def _(df, df_adapt, plt):
-    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    fig, ax = plt.subplots(1, 3, figsize=(13, 5))
 
-    right_ax = ax[0].twinx()
+    # right_ax = ax[0].twinx()
     styles = [("-", "o"), ("--", "s"), ("-.", "^"), (":", "D"), ((0, (3, 1, 1, 1)), "v")]
     for i, ((method, num_layers), df_group) in enumerate(
         df.groupby(["method", "num_layers"])
@@ -51,27 +51,27 @@ def _(df, df_adapt, plt):
             color="blue", linestyle=linestyle, marker=marker, markersize=4, label=label,
         )
         if method != "DMRG":
-            right_ax.plot(
+            ax[1].plot(
                 df_group["chi"], df_group["posttrans_depth"],
                 color="red", linestyle=linestyle, marker=marker, markersize=4,
             )
-    ax[0].legend(loc="upper right")
+    ax[0].legend(loc="lower center", bbox_to_anchor=(0.5, 1.05), ncol=2)
     ax[0].set_yscale("log")
     ax[0].set_ylabel("Energy Error", color="blue")
-    right_ax.set_ylabel("Circuit depth", color="red")
+    ax[1].set_ylabel("Circuit depth", color="red")
     ax[0].set_xlabel("Bond Dimension")
     ax[0].set_title("mps-to-circuit")
 
-    right_ax2 = ax[1].twinx()
-    ax[1].plot(df_adapt.index, df_adapt["error"], color="blue")
+    right_ax2 = ax[2].twinx()
+    ax[2].plot(df_adapt.index, df_adapt["error"], color="blue")
     right_ax2.plot(df_adapt.index, df_adapt["depths"], color="red", label="Post-transpilation")
     right_ax2.plot(df_adapt.index, df_adapt["pretrans_depths"], color="red", linestyle="--", label="Pre-transpilation")
     right_ax2.legend()
-    ax[1].set_yscale("log")
-    ax[1].set_ylabel("Energy Error", color="blue")
+    ax[2].set_yscale("log")
+    ax[2].set_ylabel("Energy Error", color="blue")
     right_ax2.set_ylabel("Circuit depth", color="red")
-    ax[1].set_xlabel("Iteration")
-    ax[1].set_title(r"ADAPT ($\chi$=32)")
+    ax[2].set_xlabel("Iteration")
+    ax[2].set_title(r"ADAPT ($\chi$=32)")
 
     fig.tight_layout()
     plt.show()
