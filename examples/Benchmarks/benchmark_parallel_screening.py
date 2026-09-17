@@ -33,7 +33,7 @@ from adaptvqe.algorithms.adapt_vqe import TensorNetAdapt
 from adaptvqe.pools import GSD
 
 # ── molecule ──────────────────────────────────────────────────────────────────
-N = 6
+N = 10
 R = 1.5
 geometry = [["H", [0, 0, i * R]] for i in range(N)]
 mol = MolecularData(geometry, "sto-3g", 1, 0, description=f"H{N}")
