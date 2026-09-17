@@ -24,13 +24,16 @@ Usage:
 import os
 import time
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 from openfermion import MolecularData
 from openfermionpyscf import run_pyscf
 from adaptvqe.algorithms.adapt_vqe import TensorNetAdapt
 from adaptvqe.pools import GSD
 
 # ── molecule ──────────────────────────────────────────────────────────────────
-N = 4
+N = 6
 R = 1.5
 geometry = [["H", [0, 0, i * R]] for i in range(N)]
 mol = MolecularData(geometry, "sto-3g", 1, 0, description=f"H{N}")
@@ -178,5 +181,13 @@ for w in WORKER_COUNTS:
     speedup = f"({mean_base/mt:.1f}x)" if w > 1 else ""
     row += f"  {mt:>7.3f} {speedup:<4}"
 print(row)
-print()
-print("Tip: if parallel is slower, try OMP_NUM_THREADS=1 to avoid BLAS oversubscription.")
+
+records = []
+for n_workers, data_dicts in all_records.items():
+    for i, data_dict in enumerate(data_dicts):
+        records.append((n_workers, i, data_dict["screening_time"]))
+df = pd.DataFrame.from_records(records, columns=["n_workers", "iter", "screening_time"])
+
+fig, ax = plt.subplots()
+sns.lineplot(ax=ax, data=df, x="iter", y="screening_time", hue="n_workers")
+plt.show()
