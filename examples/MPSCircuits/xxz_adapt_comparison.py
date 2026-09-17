@@ -46,8 +46,8 @@ if __name__ == "__main__":
         max_mps_bond=chi,
         skip_converged_rename=True
     )
+    my_adapt.initialize()
     for _ in range(NUM_ITER):
-        my_adapt.initialize()
         my_adapt.run_iteration()
         data = my_adapt.data
         qc = data.get_circuit(
