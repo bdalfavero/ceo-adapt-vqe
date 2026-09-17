@@ -213,6 +213,32 @@ def _(df_hc_ad, df_hchain, plt):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Approximate compilation
+    """)
+    return
+
+
+@app.cell
+def _(pd):
+    df_comp = pd.read_csv("overlaps.csv")
+    print(df_comp.head())
+    return (df_comp,)
+
+
+@app.cell
+def _(df_comp, plt):
+    fig_comp, ax_comp = plt.subplots()
+    ax_comp.plot(df_comp["num_layers"], 1. - df_comp["square_overlaps"])
+    ax_comp.set_ylabel(r"$1 - |\langle \psi_{approx} | \psi_{exact} \rangle|^2$")
+    ax_comp.set_xlabel("num_layers")
+    ax_comp.set_yscale("log")
+    plt.show()
+    return
+
+
 @app.cell
 def _():
     return
