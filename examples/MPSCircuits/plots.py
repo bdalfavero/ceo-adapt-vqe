@@ -74,7 +74,8 @@ def _(df, df_adapt, plt):
     ax[2].set_title(r"ADAPT ($\chi$=32)")
 
     fig.tight_layout()
-    plt.show()
+    # plt.show()
+    plt.savefig("xxz_mps_adapt.pdf")
     return
 
 
@@ -103,7 +104,8 @@ def _(df, df_adapt, plt):
     # ax2.set_xscale("log")
     ax2.set_ylabel("Energy Error")
     ax2.set_xlabel("Circuit Depth")
-    plt.show()
+    # plt.show()
+    plt.savefig("xxz_mps_adapt_error_vs_depth.pdf")
     return
 
 
