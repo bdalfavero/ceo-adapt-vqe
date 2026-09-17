@@ -28,7 +28,7 @@ from adaptvqe.algorithms.adapt_vqe import TensorNetAdapt
 from adaptvqe.pools import GSD
 
 # ── config ────────────────────────────────────────────────────────────────────
-N = 4
+N = 10
 R = 1.5
 geometry = [["H", [0, 0, i * R]] for i in range(N)]
 MAX_MPS_BOND  = 16
