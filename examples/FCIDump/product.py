@@ -22,28 +22,20 @@ NUM_ITER = 20
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("fci_filename", type=str, help="fcidump filename for Hamiltonian.")
-    parser.add_argument("--chi", type=int, default=100, help="Max MPS bond dimension")
-    parser.add_argument("--chi-mpo", type=int, default=100, help="Max MPO bond dimension")
+    parser.add_argument("mpo_filename", type=str, help="Pickle filename for Hamiltonian MPO.")
+    parser.add_argument("--chi", type=int, default=10, help="Max MPS bond dimension")
+    parser.add_argument("--chi_mpo", type=int, default=100, help="Max MPO bond dimension")
     parser.add_argument("--num-iter", type=int, default=50, help="Number of ADAPT iterations")
     args = parser.parse_args()
     chi = args.chi
     chi_mpo = args.chi_mpo
     num_iter = args.num_iter
     fcidump_fname = args.fci_filename
+    mpo_fname = args.mpo_filename
 
     h_int, norb, nelec = hamiltonian_from_fcidump(fcidump_fname)
-    print(f"Read Hamiltonian with {norb} orbitals and {nelec} electrons.")
-    mpo_fname = f"product_mpo_chi{MAX_MPO_BOND}.pkl" 
-    if not isfile(mpo_fname):
-        if isinstance(h_int, of.QubitOperator):
-            hamiltonian_mpo = qubop_to_mpo(h_int, MAX_MPO_BOND)
-        else:
-            ham_jw = of.transforms.jordan_wigner(h_int)
-            hamiltonian_mpo = qubop_to_mpo(ham_jw, MAX_MPO_BOND)
-
-        with open(mpo_fname, "wb") as f:
-            pickle.dump(hamiltonian_mpo, f)
-    print(f"Wrote Hamiltonian to {mpo_fname}")
+    with open(mpo_fname, "rb") as f:
+        hamiltonian_mpo = pickle.load(f)
 
     h = FermionicHamiltonian(
         h_int, "product", nelec, diag_mode="quimb",
