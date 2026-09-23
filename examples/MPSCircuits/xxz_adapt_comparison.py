@@ -1,5 +1,6 @@
 import pandas as pd
 import qiskit
+from qiskit.transpiler.passes import RemoveBarriers
 from qiskit_ibm_runtime.fake_provider import FakeFez
 from openfermion import MolecularData
 from openfermion.transforms import get_fermion_operator, jordan_wigner
@@ -32,6 +33,7 @@ if __name__ == "__main__":
     
     energies = []
     pretrans_depths = []
+    depths_no_barrier = []
     depths = []
     errs = []
     my_adapt = TensorNetAdapt(
@@ -54,14 +56,18 @@ if __name__ == "__main__":
             pool, indices=my_adapt.indices, coefficients=my_adapt.coefficients, include_ref=True
         )
         qc_transpiled = qiskit.transpile(qc, backend=backend)
+        qc_no_barrier = RemoveBarriers()(qc)
+        qc_nb_transpiled = qiskit.transpile(qc_no_barrier, backend=backend)
         energies.append(my_adapt.energy)
         errs.append(abs(my_adapt.energy - exact_energy))
         pretrans_depths.append(qc.depth())
+        depths_no_barrier.append(qc_nb_transpiled.depth())
         depths.append(qc_transpiled.depth())
 
 
     output_data = {
-        "energy": energies, "error": errs, "depths": depths, "pretrans_depths": pretrans_depths
+        "energy": energies, "error": errs, "depths": depths, "pretrans_depths": pretrans_depths,
+        "no_barrier_depths": depths_no_barrier
     }
     df = pd.DataFrame.from_dict(output_data, orient='columns')
     df.to_csv("xxz_adapt_bond_results.csv", index=False)
