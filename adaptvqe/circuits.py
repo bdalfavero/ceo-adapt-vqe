@@ -213,6 +213,10 @@ def double_qe_circuit(source_orbs, target_orbs, theta, n, big_endian=False):
     qc.cx(a, b)
     qc.cx(c, d)
 
+    # The gates above implement e^(-i pi/4) exp(theta * A). Record the compensating global phase so that the
+    # circuit is exactly exp(theta * A), which matters when bra and ket are propagated separately.
+    qc.global_phase += np.pi / 4
+
     return qc
 
 
@@ -367,6 +371,10 @@ def double_fe_circuit(source_orbs, target_orbs, theta, n, big_endian=False):
         qc.cz(z_qubits[-1], a)
     for i, j in zip(reversed(z_qubits[:-1]),reversed(z_qubits[1:])):
         qc.cx(i,j)
+
+    # The gates above implement e^(-i pi/4) exp(theta * A). Record the compensating global phase so that the
+    # circuit is exactly exp(theta * A), which matters when bra and ket are propagated separately.
+    qc.global_phase += np.pi / 4
 
     return qc
 
@@ -713,6 +721,10 @@ def ovp_ceo_circuit(source_orbs, target_orbs, n, theta, ceo_type, big_endian=Fal
     qc.cx(c, d)
 
     qc.rz(-np.pi / 2, b)
+
+    # The gates above implement e^(+i pi/4) exp(theta * A). Record the compensating global phase so that the
+    # circuit is exactly exp(theta * A), which matters when bra and ket are propagated separately.
+    qc.global_phase -= np.pi / 4
 
     return qc
 

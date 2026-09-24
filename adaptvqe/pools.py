@@ -113,6 +113,7 @@ class PoolOperator(metaclass=abc.ABCMeta):
         self.imp_operator = None  # implemented version (e.g. Qiskit Operator)
         self.exp_operator = None  # exponential version (e.g. trotter circuit)
         self.mpo_operator = None
+        self.mpo_nq = None  # number of sites mpo_operator was built with
         self.grad_meas = None  # gradient observable
         self.twin_string_ops = []  # operators in the same pool with the exact same Pauli strings
         self.source_orbs = source_orbs
@@ -210,6 +211,7 @@ class PoolOperator(metaclass=abc.ABCMeta):
         """Create an MPO version of the operator."""
 
         self.mpo_operator = qubop_to_mpo(self.q_operator, max_bond, nq)
+        self.mpo_nq = nq
 
     @property
     def f_operator(self):
@@ -528,12 +530,15 @@ class OperatorPool(metaclass=abc.ABCMeta):
         return self.operators[index].q_operator
     
     def get_mpo_op(self, index, nq: Optional[int]=None):
-        """Convert the qubit operator form to an MPO."""
+        """Convert the qubit operator form to an MPO on nq sites (default: all self.n qubits)."""
 
-        if self.operators[index].mpo_operator is None:
-            self.operators[index].create_mpo(nq=nq, max_bond=self.max_mpo_bond)
-        op_mps = self.operators[index].mpo_operator
-        return op_mps
+        if nq is None:
+            nq = self.n
+        operator = self.operators[index]
+        # A cached MPO is only valid for the number of sites it was built with
+        if operator.mpo_operator is None or getattr(operator, "mpo_nq", None) != nq:
+            operator.create_mpo(nq=nq, max_bond=self.max_mpo_bond)
+        return operator.mpo_operator
 
     def get_exp_op(self, index, coefficient=1):
         """
@@ -616,7 +621,8 @@ class OperatorPool(metaclass=abc.ABCMeta):
         circuit_mps = qtn.circuit.CircuitMPS.from_openqasm2_str(
             qasm_str, psi0=state.copy(), max_bond=max_bond, progbar=False
         )
-        return circuit_mps.psi
+        # OpenQASM 2 has no global phase, so reapply it here
+        return circuit_mps.psi * np.exp(1j * evolution_circuit.global_phase)
 
     def expm_mult_circuit(self, coefficient, index, state):
         """Do an expm_mult using the generated circuit.
@@ -1512,9 +1518,7 @@ class PauliPool(SingletGSD):
     def tn_expm_mult_state(self, coefficient, index, state: MatrixProductState, max_bond=None, **kwargs):
         """exponentiates a pool operator times a coefficient, then multiplies it by a state."""
 
-        if self.operators[index].mpo_operator is None:
-            self.operators[index].create_mpo(max_bond=self.max_mpo_bond)
-        op_mps = self.operators[index].mpo_operator
+        op_mps = self.get_mpo_op(index, state.L)
     
         # There is a weird thing in quimb where we can't multiply an MPS by 0.
         # If coefficient is near 0, replace sin(coefficient) -> 1e-18.

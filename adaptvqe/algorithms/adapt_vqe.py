@@ -38,6 +38,24 @@ from ..utils import bfgs_update
 from ..tensor_helpers import computational_basis_mps, qubop_to_mpo
 from quimb.tensor.tensor_1d_compress import tensor_network_1d_compress_direct
 
+
+# Worker-side state for parallel gradient screening. Each worker process holds its own copy of the
+# AdaptVQE instance, sent once when the worker pool is created (see AdaptVQE._get_screening_pool).
+_worker_adapt = None
+
+
+def _init_screening_worker(adapt):
+    global _worker_adapt
+    _worker_adapt = adapt
+
+
+def _screen_chunk(index_chunk, coefficients, indices, sweep_state):
+    """Evaluate eval_candidate_gradient for index_chunk in a worker, after syncing the per-sweep state."""
+    for name, value in sweep_state.items():
+        setattr(_worker_adapt, name, value)
+    return [_worker_adapt.eval_candidate_gradient(i, coefficients, indices) for i in index_chunk]
+
+
 class AdaptVQE(metaclass=abc.ABCMeta):
     """
     Class for running the ADAPT-VQE algorithm.
@@ -150,6 +168,7 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         self.mpo_filename = mpo_filename
         self.n_screening_workers = n_screening_workers
         self.n_optim_workers = n_optim_workers
+        self._screening_pool = None  # persistent worker processes, created on first parallel sweep
 
         # Attributes describing type of CEO pool, when applicable. The algorithm runs differently for each of them
         self.dvg = "DVG" in self.pool.name
@@ -504,24 +523,74 @@ class AdaptVQE(metaclass=abc.ABCMeta):
 
         return state
 
+    def __getstate__(self):
+        # multiprocessing.Pool objects can't be pickled; workers never need it anyway
+        state = self.__dict__.copy()
+        state.pop("_screening_pool", None)
+        return state
+
+    def _screening_sweep_state(self):
+        """
+        Attributes read by eval_candidate_gradient that change between screening sweeps. These are sent to the
+        worker processes at every sweep; everything else is taken from the snapshot made when the workers started.
+        Subclasses that add such attributes should extend this dictionary.
+        """
+        return {"state": self.state, "coefficients": self.coefficients, "indices": self.indices}
+
+    def _get_screening_pool(self):
+        """
+        Return the persistent pool of n_screening_workers - 1 worker processes, creating it if needed. The parent
+        process screens its own share of operators, so all n_screening_workers cores are busy during a sweep.
+        Each worker receives a copy of self once, at creation. Pool operator caches (MPOs, gradient observables)
+        built in a worker persist in that worker across sweeps.
+        """
+        if getattr(self, "_screening_pool", None) is None:
+            self._screening_pool = multiprocessing.Pool(
+                processes=self.n_screening_workers - 1,
+                initializer=_init_screening_worker,
+                initargs=(self,),
+            )
+        return self._screening_pool
+
+    def close_screening_pool(self):
+        """Shut down the screening worker processes, if any. They are recreated on the next parallel sweep."""
+        if getattr(self, "_screening_pool", None) is not None:
+            self._screening_pool.close()
+            self._screening_pool.join()
+            self._screening_pool = None
+
     def _map_gradients(self, index_list, coefficients, indices):
         """
         Compute eval_candidate_gradient for each index in index_list, optionally in parallel.
 
-        When n_screening_workers > 1 the evaluations are fanned out across a process pool.
-        Each call is independent (reads shared state, writes only to its own pool slot), so
-        this is safe.  Because numpy/quimb already use multi-threaded BLAS internally,
-        setting OMP_NUM_THREADS=1 (or equivalent) before launching the process is recommended
-        when using more than one worker, to avoid thread oversubscription.
+        When n_screening_workers > 1 the index list is dealt round-robin into n_screening_workers chunks. The
+        first chunk is evaluated in this process while the others are evaluated by the persistent worker
+        processes. Workers only read their own copy of the instance and return values, so there are no shared
+        writes. Because numpy/quimb already use multi-threaded BLAS internally, setting OMP_NUM_THREADS=1 (or
+        equivalent) before launching the process is recommended when using more than one worker, to avoid
+        thread oversubscription.
         """
-        if self.n_screening_workers == 1 or len(index_list) < 2:
+        n_chunks = self.n_screening_workers
+        if n_chunks == 1 or len(index_list) < 2:
             return [self.eval_candidate_gradient(i, coefficients, indices) for i in index_list]
 
-        with multiprocessing.Pool(processes=self.n_screening_workers) as pool:
-            return pool.starmap(
-                self.eval_candidate_gradient,
-                [(i, coefficients, indices) for i in index_list],
-            )
+        # Round-robin keeps each index on the same process across sweeps (so its cached operators are reused)
+        # and spreads operators of similar cost evenly between processes
+        chunks = [index_list[k::n_chunks] for k in range(n_chunks)]
+        sweep_state = self._screening_sweep_state()
+        screening_pool = self._get_screening_pool()
+        pending = [
+            screening_pool.apply_async(_screen_chunk, (chunk, coefficients, indices, sweep_state))
+            for chunk in chunks[1:]
+        ]
+        local_gradients = [self.eval_candidate_gradient(i, coefficients, indices) for i in chunks[0]]
+
+        gradients = [None] * len(index_list)
+        gradients[0::n_chunks] = local_gradients
+        for k, result in enumerate(pending, start=1):
+            gradients[k::n_chunks] = result.get()
+
+        return gradients
 
     def rank_gradients(self, coefficients=None, indices=None, silent=False):
         """
@@ -1307,19 +1376,22 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         # Initialize data structures
         self.initialize()
 
-        finished = False
-        while not finished and self.data.iteration_counter < self.max_adapt_iter:
-            # Run one iteration and check if we have converged. This might add one operator or more depending on
-            # the algorithm configuration  (e.g. if self.tetris=True, we may add multiple operators)
-            finished = self.run_iteration()
+        try:
+            finished = False
+            while not finished and self.data.iteration_counter < self.max_adapt_iter:
+                # Run one iteration and check if we have converged. This might add one operator or more depending on
+                # the algorithm configuration  (e.g. if self.tetris=True, we may add multiple operators)
+                finished = self.run_iteration()
 
-        if not finished:
-            # The last time we measured the gradients was in the beginning of the last iteration. Remeasure in the end
-            print("Performing final convergence check...")
-            viable_candidates, viable_gradients, total_norm, max_norm = (
-                self.rank_gradients(silent=True)
-            )
-            finished = self.probe_termination(total_norm, max_norm)
+            if not finished:
+                # The last time we measured the gradients was in the beginning of the last iteration. Remeasure in the end
+                print("Performing final convergence check...")
+                viable_candidates, viable_gradients, total_norm, max_norm = (
+                    self.rank_gradients(silent=True)
+                )
+                finished = self.probe_termination(total_norm, max_norm)
+        finally:
+            self.close_screening_pool()
 
         if finished:
             print("\nConvergence condition achieved!\n")
@@ -4142,7 +4214,7 @@ class TensorNetAdapt(AdaptVQE):
             coefficients = []
             indices = []
 
-        operator_mpo = self.pool.get_mpo_op(index)
+        operator_mpo = self.pool.get_mpo_op(index, len(self.hamiltonian_mpo.tensors))
 
         left_matrix = self.compute_state(coefficients, indices)
 
@@ -4219,7 +4291,7 @@ class TensorNetAdapt(AdaptVQE):
         right_matrix = self.tn_ref_state
 
         for index in range(self.pool.size):
-            operator = self.pool.get_mpo_op(index)
+            operator = self.pool.get_mpo_op(index, len(hamiltonian_mpo.tensors))
             new_right_matrix = self.compute_state(
                 coefficients,
                 indices,
@@ -4289,13 +4361,17 @@ class TensorNetAdapt(AdaptVQE):
 
         # Ansatz gradients
         for operator_pos in range(len(indices)):
-            operator = self.pool.get_mpo_op(indices[operator_pos])
+            operator = self.pool.get_mpo_op(indices[operator_pos], len(hamiltonian.tensors))
             coefficient = coefficients[operator_pos]
             index = indices[operator_pos]
 
-            # left_matrix = self.pool.tn_expm_mult_state(coefficient, index, left_matrix)
-            left_matrix = self.pool.tn_expm_mult_state(coefficient, index, left_matrix.H, max_bond=self.max_mps_bond).H
-            right_matrix = self.pool.tn_expm_mult_state(coefficient, index, right_matrix, max_bond=self.max_mps_bond)
+            # Use the same endianness as compute_state
+            left_matrix = self.pool.tn_expm_mult_state(
+                coefficient, index, left_matrix.H, max_bond=self.max_mps_bond, big_endian=False
+            ).H
+            right_matrix = self.pool.tn_expm_mult_state(
+                coefficient, index, right_matrix, max_bond=self.max_mps_bond, big_endian=False
+            )
 
             # gradient = 2 * (left_matrix.H @ right_matrix.gate_with_mpo(operator)).real
             gradient = 2 * (left_matrix @ right_matrix.gate_with_mpo(operator)).real
@@ -4361,6 +4437,11 @@ class TensorNetAdapt(AdaptVQE):
         gradient = self.evaluate_observable(observable, coefficients, indices)
 
         return gradient
+
+    def _screening_sweep_state(self):
+        sweep_state = super()._screening_sweep_state()
+        sweep_state["_H_ket"] = self._H_ket
+        return sweep_state
 
     def rank_gradients(self, coefficients=None, indices=None, silent=False):
         """

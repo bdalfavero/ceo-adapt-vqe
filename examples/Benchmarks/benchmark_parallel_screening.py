@@ -110,6 +110,7 @@ def run_timed(adapt, n_iter, label):
                 break
     finally:
         cls.rank_gradients = orig_rank
+        adapt.close_screening_pool()
     print()
     return records, adapt.energy
 
