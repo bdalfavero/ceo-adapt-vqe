@@ -38,6 +38,11 @@ R = 1.5
 geometry = [["H", [0, 0, i * R]] for i in range(N)]
 mol = MolecularData(geometry, "sto-3g", 1, 0, description=f"H{N}")
 mol = run_pyscf(mol, run_fci=True, run_scf=True)
+# Drop the cached pyscf FCI solver: it holds a reference to a locally-defined
+# class (FCI.<locals>.CISolver) that can't be pickled, which breaks
+# multiprocessing-based screening. mol.fci_energy (a plain float) is already
+# extracted above and is unaffected.
+del mol._pyscf_data["fci"]
 print(f"H{N}  HF={mol.hf_energy:.8f}  FCI={mol.fci_energy:.8f}")
 print(f"BLAS threads (OMP_NUM_THREADS): {os.environ.get('OMP_NUM_THREADS', 'not set')}\n")
 
@@ -69,12 +74,16 @@ def run_timed(adapt, n_iter, label):
     """
     Run n_iter iterations, record (screening_time, total_norm, sel_indices, energy) per iter.
     """
+    # Patch rank_gradients on the CLASS, not the instance: an instance-attribute
+    # closure would live in adapt.__dict__ and break pickling of `self` when
+    # dispatching eval_candidate_gradient to worker processes.
     records = []
-    orig_rank = adapt.rank_gradients
+    cls = type(adapt)
+    orig_rank = cls.rank_gradients
 
-    def timed_rank(*args, **kwargs):
+    def timed_rank(self, *args, **kwargs):
         t0 = time.perf_counter()
-        result = orig_rank(*args, **kwargs)
+        result = orig_rank(self, *args, **kwargs)
         elapsed = time.perf_counter() - t0
         sel_indices, sel_gradients, total_norm, max_norm = result
         records.append({
@@ -85,109 +94,116 @@ def run_timed(adapt, n_iter, label):
         })
         return result
 
-    adapt.rank_gradients = timed_rank
-    adapt.initialize()
+    cls.rank_gradients = timed_rank
+    try:
+        adapt.initialize()
 
-    print(f"── workers={adapt.n_screening_workers} ──")
-    for i in range(n_iter):
-        finished = adapt.run_iteration()
-        r = records[-1]
-        print(
-            f"  iter {i+1}: screen={r['screening_time']:.3f}s  "
-            f"‖g‖={r['total_norm']:.6f}  E={adapt.energy:.8f}"
-        )
-        if finished:
-            break
+        print(f"── workers={adapt.n_screening_workers} ──")
+        for i in range(n_iter):
+            finished = adapt.run_iteration()
+            r = records[-1]
+            print(
+                f"  iter {i+1}: screen={r['screening_time']:.3f}s  "
+                f"‖g‖={r['total_norm']:.6f}  E={adapt.energy:.8f}"
+            )
+            if finished:
+                break
+    finally:
+        cls.rank_gradients = orig_rank
     print()
     return records, adapt.energy
 
 
-all_records = {}
-all_energies = {}
+if __name__ == "__main__":
+    # Guard required on macOS/Windows: multiprocessing uses "spawn", which
+    # re-imports this file in each worker process. Without this guard, that
+    # re-import would re-run the whole benchmark recursively in every worker.
+    all_records = {}
+    all_energies = {}
 
-for n_workers in WORKER_COUNTS:
-    adapt = build(n_workers)
-    records, final_energy = run_timed(adapt, N_ADAPT_ITER, f"workers={n_workers}")
-    all_records[n_workers] = records
-    all_energies[n_workers] = final_energy
+    for n_workers in WORKER_COUNTS:
+        adapt = build(n_workers)
+        records, final_energy = run_timed(adapt, N_ADAPT_ITER, f"workers={n_workers}")
+        all_records[n_workers] = records
+        all_energies[n_workers] = final_energy
 
-# ── correctness check ─────────────────────────────────────────────────────────
-print("=" * 60)
-print("Correctness: parallel vs. serial (workers=1)")
-print("=" * 60)
-baseline = all_records[1]
-all_pass = True
+    # ── correctness check ───────────────────────────────────────────────────
+    print("=" * 60)
+    print("Correctness: parallel vs. serial (workers=1)")
+    print("=" * 60)
+    baseline = all_records[1]
+    all_pass = True
 
-for n_workers in WORKER_COUNTS[1:]:
-    records = all_records[n_workers]
-    n = min(len(baseline), len(records))
-    print(f"\nworkers={n_workers} vs. serial:")
-    for i in range(n):
-        b, r = baseline[i], records[i]
+    for n_workers in WORKER_COUNTS[1:]:
+        records = all_records[n_workers]
+        n = min(len(baseline), len(records))
+        print(f"\nworkers={n_workers} vs. serial:")
+        for i in range(n):
+            b, r = baseline[i], records[i]
 
-        norm_diff  = abs(b["total_norm"] - r["total_norm"])
-        ops_match  = b["sel_indices"] == r["sel_indices"]
-        grads_diff = max(
-            (abs(a - c) for a, c in zip(b["sel_gradients"], r["sel_gradients"])),
-            default=0.0,
-        )
-        ok = norm_diff < ATOL and ops_match and grads_diff < ATOL
-        if not ok:
+            norm_diff  = abs(b["total_norm"] - r["total_norm"])
+            ops_match  = b["sel_indices"] == r["sel_indices"]
+            grads_diff = max(
+                (abs(a - c) for a, c in zip(b["sel_gradients"], r["sel_gradients"])),
+                default=0.0,
+            )
+            ok = norm_diff < ATOL and ops_match and grads_diff < ATOL
+            if not ok:
+                all_pass = False
+            print(
+                f"  iter {i+1}: [{'PASS' if ok else 'FAIL'}]  "
+                f"‖g‖ diff={norm_diff:.1e}  "
+                f"ops={'match' if ops_match else 'MISMATCH'}  "
+                f"max grad diff={grads_diff:.1e}"
+            )
+
+        e_diff = abs(all_energies[1] - all_energies[n_workers])
+        e_ok = e_diff < ATOL
+        if not e_ok:
             all_pass = False
         print(
-            f"  iter {i+1}: [{'PASS' if ok else 'FAIL'}]  "
-            f"‖g‖ diff={norm_diff:.1e}  "
-            f"ops={'match' if ops_match else 'MISMATCH'}  "
-            f"max grad diff={grads_diff:.1e}"
+            f"  final energy: serial={all_energies[1]:.10f}  "
+            f"parallel={all_energies[n_workers]:.10f}  "
+            f"diff={e_diff:.1e}  [{'PASS' if e_ok else 'FAIL'}]"
         )
 
-    e_diff = abs(all_energies[1] - all_energies[n_workers])
-    e_ok = e_diff < ATOL
-    if not e_ok:
-        all_pass = False
-    print(
-        f"  final energy: serial={all_energies[1]:.10f}  "
-        f"parallel={all_energies[n_workers]:.10f}  "
-        f"diff={e_diff:.1e}  [{'PASS' if e_ok else 'FAIL'}]"
-    )
+    print()
+    print(f"Overall correctness: {'ALL PASS' if all_pass else 'FAILURES DETECTED'}")
 
-print()
-print(f"Overall correctness: {'ALL PASS' if all_pass else 'FAILURES DETECTED'}")
+    # ── timing table ────────────────────────────────────────────────────────
+    print()
+    print("=" * 60)
+    print("Screening wall time (seconds) per iteration")
+    print("=" * 60)
+    col = 12
+    header = f"{'Iter':>4}" + "".join(f"  {'workers='+str(w):>{col}}" for w in WORKER_COUNTS)
+    print(header)
+    print("-" * len(header))
+    n_iters = min(len(all_records[w]) for w in WORKER_COUNTS)
+    for i in range(n_iters):
+        row = f"{i+1:>4}"
+        base_t = all_records[1][i]["screening_time"]
+        for w in WORKER_COUNTS:
+            t = all_records[w][i]["screening_time"]
+            speedup = f"({base_t/t:.1f}x)" if w > 1 else ""
+            row += f"  {t:>7.3f} {speedup:<4}"
+        print(row)
 
-# ── timing table ──────────────────────────────────────────────────────────────
-print()
-print("=" * 60)
-print("Screening wall time (seconds) per iteration")
-print("=" * 60)
-col = 12
-header = f"{'Iter':>4}" + "".join(f"  {'workers='+str(w):>{col}}" for w in WORKER_COUNTS)
-print(header)
-print("-" * len(header))
-n_iters = min(len(all_records[w]) for w in WORKER_COUNTS)
-for i in range(n_iters):
-    row = f"{i+1:>4}"
-    base_t = all_records[1][i]["screening_time"]
+    mean_base = np.mean([r["screening_time"] for r in all_records[1]])
+    print("-" * len(header))
+    row = f"{'mean':>4}"
     for w in WORKER_COUNTS:
-        t = all_records[w][i]["screening_time"]
-        speedup = f"({base_t/t:.1f}x)" if w > 1 else ""
-        row += f"  {t:>7.3f} {speedup:<4}"
+        mt = np.mean([r["screening_time"] for r in all_records[w]])
+        speedup = f"({mean_base/mt:.1f}x)" if w > 1 else ""
+        row += f"  {mt:>7.3f} {speedup:<4}"
     print(row)
 
-mean_base = np.mean([r["screening_time"] for r in all_records[1]])
-print("-" * len(header))
-row = f"{'mean':>4}"
-for w in WORKER_COUNTS:
-    mt = np.mean([r["screening_time"] for r in all_records[w]])
-    speedup = f"({mean_base/mt:.1f}x)" if w > 1 else ""
-    row += f"  {mt:>7.3f} {speedup:<4}"
-print(row)
+    records = []
+    for n_workers, data_dicts in all_records.items():
+        for i, data_dict in enumerate(data_dicts):
+            records.append((n_workers, i, data_dict["screening_time"]))
+    df = pd.DataFrame.from_records(records, columns=["n_workers", "iter", "screening_time"])
 
-records = []
-for n_workers, data_dicts in all_records.items():
-    for i, data_dict in enumerate(data_dicts):
-        records.append((n_workers, i, data_dict["screening_time"]))
-df = pd.DataFrame.from_records(records, columns=["n_workers", "iter", "screening_time"])
-
-fig, ax = plt.subplots()
-sns.lineplot(ax=ax, data=df, x="iter", y="screening_time", hue="n_workers")
-plt.show()
+    fig, ax = plt.subplots()
+    sns.lineplot(ax=ax, data=df, x="iter", y="screening_time", hue="n_workers")
+    plt.show()

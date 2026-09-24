@@ -7,6 +7,8 @@ Created on Wed Jun 29 10:00:03 2022
 
 from warnings import warn
 
+import multiprocessing
+from functools import partial
 import pickle
 
 from copy import copy, deepcopy
@@ -506,22 +508,20 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         """
         Compute eval_candidate_gradient for each index in index_list, optionally in parallel.
 
-        When n_screening_workers > 1 the evaluations are fanned out across a thread pool.
+        When n_screening_workers > 1 the evaluations are fanned out across a process pool.
         Each call is independent (reads shared state, writes only to its own pool slot), so
-        threading is safe.  Because numpy/quimb already use multi-threaded BLAS internally,
+        this is safe.  Because numpy/quimb already use multi-threaded BLAS internally,
         setting OMP_NUM_THREADS=1 (or equivalent) before launching the process is recommended
         when using more than one worker, to avoid thread oversubscription.
         """
         if self.n_screening_workers == 1 or len(index_list) < 2:
             return [self.eval_candidate_gradient(i, coefficients, indices) for i in index_list]
 
-        from concurrent.futures import ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=self.n_screening_workers) as executor:
-            futures = [
-                executor.submit(self.eval_candidate_gradient, i, coefficients, indices)
-                for i in index_list
-            ]
-            return [f.result() for f in futures]
+        with multiprocessing.Pool(processes=self.n_screening_workers) as pool:
+            return pool.starmap(
+                self.eval_candidate_gradient,
+                [(i, coefficients, indices) for i in index_list],
+            )
 
     def rank_gradients(self, coefficients=None, indices=None, silent=False):
         """
@@ -1262,21 +1262,16 @@ class AdaptVQE(metaclass=abc.ABCMeta):
             # no writes to shared instance attributes. Thread-safe for both subclasses.
             # Note: numpy/quimb use multi-threaded BLAS; set OMP_NUM_THREADS=1 to avoid
             # oversubscription when n_optim_workers is large.
-            from concurrent.futures import ThreadPoolExecutor
-            with ThreadPoolExecutor(max_workers=self.n_optim_workers) as executor:
-                futures = [
-                    executor.submit(
-                        self.estimate_gradient,
-                        operator_pos=pos,
-                        coefficients=coefficients,
-                        indices=indices,
-                        method=method,
-                        dx=dx,
-                        orb_params=orb_params,
-                    )
-                    for pos in positions
-                ]
-                gradients = [f.result() for f in futures]
+            func = partial(
+                self.estimate_gradient,
+                coefficients=coefficients,
+                indices=indices,
+                method=method,
+                dx=dx,
+                orb_params=orb_params,
+            )
+            with multiprocessing.Pool(processes=self.n_optim_workers) as pool:
+                gradients = pool.map(func, positions)
 
         return gradients
 
