@@ -128,6 +128,43 @@ def _(df_trig, plt):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Trigonometric identity for all pools
+
+    `tn_expm_mult_state` of GSD, SD, QE and CEO (and their subclasses) now uses the identity above.
+    Both tensor network methods are compared to the exact (sparse) state.
+    """)
+    return
+
+
+@app.cell
+def _(pd):
+    df_pools = pd.read_csv("trig_tn_expm_pools_results.csv")
+    print(df_pools.groupby("pool")["speedup"].describe())
+    return (df_pools,)
+
+
+@app.cell
+def _(df_pools, np, plt):
+    fig4, ax4 = plt.subplots(1, 2, figsize=(10, 4))
+    for pool_name in np.unique(df_pools["pool"]):
+        df_p = df_pools[df_pools["pool"] == pool_name]
+        ax4[0].plot(df_p["depths"], df_p["speedup"], label=pool_name)
+        line, = ax4[1].plot(df_p["depths"], df_p["avg_infidelity_trig"], label=f"{pool_name} (trig.)")
+        ax4[1].plot(df_p["depths"], df_p["avg_infidelity_circuit"], "--", color=line.get_color())
+    ax4[0].set_xlabel("Depth")
+    ax4[0].set_ylabel("Speedup (circuit time / trig. time)")
+    ax4[0].legend()
+    ax4[1].set_xlabel("Depth")
+    ax4[1].set_ylabel("Infidelity vs. exact (dashed: circuit)")
+    ax4[1].set_yscale("log")
+    fig4.tight_layout()
+    fig4
+    return
+
+
 @app.cell
 def _():
     return

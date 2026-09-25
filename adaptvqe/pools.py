@@ -624,6 +624,30 @@ class OperatorPool(metaclass=abc.ABCMeta):
         # OpenQASM 2 has no global phase, so reapply it here
         return circuit_mps.psi * np.exp(1j * evolution_circuit.global_phase)
 
+    def _tn_trig_expm_mult_state(self, coefficient, index, state: MatrixProductState, max_bond=None):
+        """Multiply the state by e^(coefficient * A), where A is the pool operator labeled by index.
+        Uses the trigonometric formula e^(c A) = I + sin(c) A + (1 - cos(c)) A^2, which is only valid when
+        A^3 = -A (fermionic excitations, qubit excitations, OVP-CEOs). The generator is applied as an MPO,
+        so no circuit is needed. The result is always compressed: to max_bond if given, otherwise with
+        quimb's default cutoff only, so the bond dimension doesn't grow with every exponential."""
+
+        op_mpo = self.get_mpo_op(index, state.L)
+        op_state = op_mpo.apply(state)
+        op2_state = op_mpo.apply(op_state)
+
+        # There is a weird thing in quimb where we can't multiply an MPS by 0.
+        # If a prefactor is near 0, replace it by 1e-18.
+        sin_coeff = np.sin(coefficient)
+        if abs(sin_coeff) <= 1e-18:
+            sin_coeff = 1e-18
+        cos_coeff = 1 - np.cos(coefficient)
+        if abs(cos_coeff) <= 1e-18:
+            cos_coeff = 1e-18
+
+        mult_state = state + sin_coeff * op_state + cos_coeff * op2_state
+        mult_state.compress(max_bond=max_bond)
+        return mult_state
+
     def expm_mult_circuit(self, coefficient, index, state):
         """Do an expm_mult using the generated circuit.
         For debugging purposes."""
@@ -1026,6 +1050,16 @@ class GSD(OperatorPool):
 
         return m
 
+    def tn_expm_mult_state(self, coefficient, index, state: MatrixProductState, max_bond=None, big_endian=False):
+        """Multiply the state by the exponential of the operator defined by index, when multiplied by the
+        coefficient. Uses the trigonometric formula e^(c A) = I + sin(c) A + (1 - cos(c)) A^2 with A as an MPO,
+        which is much faster than simulating the circuit of the exponential.
+
+        The MPO puts qubit i on site i, which matches the circuit-based method with big_endian=False only."""
+        if big_endian:
+            raise NotImplementedError("The MPO-based exponential only supports big_endian=False.")
+        return self._tn_trig_expm_mult_state(coefficient, index, state, max_bond=max_bond)
+
     def get_circuit(self, indices, coefficients, staircase_method=False, big_endian=True):
         """
         Returns the circuit corresponding to the ansatz defined by the arguments, as a Qiskit QuantumCircuit.
@@ -1209,6 +1243,16 @@ class SD(OperatorPool):
         m = other + np.sin(coefficient) * m + (1 - np.cos(coefficient)) * op.dot(m)
 
         return m
+
+    def tn_expm_mult_state(self, coefficient, index, state: MatrixProductState, max_bond=None, big_endian=False):
+        """Multiply the state by the exponential of the operator defined by index, when multiplied by the
+        coefficient. Uses the trigonometric formula e^(c A) = I + sin(c) A + (1 - cos(c)) A^2 with A as an MPO,
+        which is much faster than simulating the circuit of the exponential.
+
+        The MPO puts qubit i on site i, which matches the circuit-based method with big_endian=False only."""
+        if big_endian:
+            raise NotImplementedError("The MPO-based exponential only supports big_endian=False.")
+        return self._tn_trig_expm_mult_state(coefficient, index, state, max_bond=max_bond)
 
     def get_circuit(self, indices, coefficients):
         """
@@ -2141,6 +2185,16 @@ class QE(OperatorPool):
 
         return m
 
+    def tn_expm_mult_state(self, coefficient, index, state: MatrixProductState, max_bond=None, big_endian=False):
+        """Multiply the state by the exponential of the operator defined by index, when multiplied by the
+        coefficient. Uses the trigonometric formula e^(c A) = I + sin(c) A + (1 - cos(c)) A^2 with A as an MPO,
+        which is much faster than simulating the circuit of the exponential.
+
+        The MPO puts qubit i on site i, which matches the circuit-based method with big_endian=False only."""
+        if big_endian:
+            raise NotImplementedError("The MPO-based exponential only supports big_endian=False.")
+        return self._tn_trig_expm_mult_state(coefficient, index, state, max_bond=max_bond)
+
     def get_circuit(self, indices, coefficients, big_endian=True):
         """
         Returns the circuit corresponding to the ansatz defined by the arguments.
@@ -2445,6 +2499,16 @@ class CEO(OperatorPool):
         m = other + np.sin(coefficient) * m + (1 - np.cos(coefficient)) * op.dot(m)
 
         return m
+
+    def tn_expm_mult_state(self, coefficient, index, state: MatrixProductState, max_bond=None, big_endian=False):
+        """Multiply the state by the exponential of the operator defined by index, when multiplied by the
+        coefficient. Uses the trigonometric formula e^(c A) = I + sin(c) A + (1 - cos(c)) A^2 with A as an MPO,
+        which is much faster than simulating the circuit of the exponential.
+
+        The MPO puts qubit i on site i, which matches the circuit-based method with big_endian=False only."""
+        if big_endian:
+            raise NotImplementedError("The MPO-based exponential only supports big_endian=False.")
+        return self._tn_trig_expm_mult_state(coefficient, index, state, max_bond=max_bond)
 
     def get_circuit(self, indices, coefficients, big_endian=True):
         """
