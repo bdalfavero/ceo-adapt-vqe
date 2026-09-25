@@ -46,6 +46,7 @@ def qubop_to_mpo_parallel(
                 tensor_network_1d_compress_direct(total_mpo, max_bond=max_bond, inplace=True)
         return total_mpo
     
+    # TODO add a batch-and-checkpoint system where we save subsets of terms to files. Parallelize the chunks individually.
     keys = sorted(list(qubop.terms.keys()))
     # return worker_callback(keys)
     keys_per_batch = int(len(keys) / n_workers)
