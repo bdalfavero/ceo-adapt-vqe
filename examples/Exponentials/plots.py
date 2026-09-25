@@ -90,6 +90,44 @@ def _(df_alt, plt):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Exponentials from the trigonometric identity
+
+    For GSD generators $A^3 = -A$, so $e^{cA} = I + \sin(c) A + (1 - \cos(c)) A^2$.
+    Each exponential is applied with two MPO-MPS products and one compression, instead of simulating a circuit.
+    """)
+    return
+
+
+@app.cell
+def _(pd):
+    df_trig = pd.read_csv("trig_mpo_expm_results.csv")
+    print(df_trig.head())
+    return (df_trig,)
+
+
+@app.cell
+def _(df_trig, plt):
+    fig3, ax3 = plt.subplots(1, 2)
+    ax3[0].errorbar(df_trig["depths"], df_trig["avg_times_la"], yerr=df_trig["std_times_la"], label="LinAlg")
+    ax3[0].errorbar(df_trig["depths"], df_trig["avg_times_tn"], yerr=df_trig["std_times_tn"], label="TensorNet (circuit)")
+    ax3[0].errorbar(df_trig["depths"], df_trig["avg_times_trig"], yerr=df_trig["std_times_trig"], label="TensorNet (trig. MPO)")
+    ax3[0].legend()
+    ax3[0].set_xlabel("Depth")
+    ax3[0].set_ylabel("Time (ns)")
+    ax3[0].set_yscale("log")
+
+    ax3[1].errorbar(df_trig["depths"], df_trig["avg_infidelity"], yerr=df_trig["std_infidelity"])
+    ax3[1].set_xlabel("Depth")
+    ax3[1].set_ylabel("Infidelity (circuit vs. trig. MPO)")
+
+    fig3.tight_layout()
+    fig3
+    return
+
+
 @app.cell
 def _():
     return
