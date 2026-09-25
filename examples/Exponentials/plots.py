@@ -165,8 +165,11 @@ def _(df_pools, np, plt):
     return
 
 
-@app.cell
-def _():
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Trigonometric formulas
+    """)
     return
 
 

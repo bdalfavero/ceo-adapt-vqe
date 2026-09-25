@@ -107,7 +107,7 @@ def benchmark_pool(pool_class, mol, chi, rng):
 
 if __name__ == "__main__":
     N = 4
-    chi = 15
+    chi = 20
 
     r = 1.5
     geometry = [['H', [0, 0, i * r]] for i in range(N)]
