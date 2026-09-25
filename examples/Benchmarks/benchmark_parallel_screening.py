@@ -33,7 +33,7 @@ from adaptvqe.algorithms.adapt_vqe import TensorNetAdapt
 from adaptvqe.pools import GSD
 
 # ── molecule ──────────────────────────────────────────────────────────────────
-N = 10
+N = 6
 R = 1.5
 geometry = [["H", [0, 0, i * R]] for i in range(N)]
 mol = MolecularData(geometry, "sto-3g", 1, 0, description=f"H{N}")
@@ -204,6 +204,7 @@ if __name__ == "__main__":
         for i, data_dict in enumerate(data_dicts):
             records.append((n_workers, i, data_dict["screening_time"]))
     df = pd.DataFrame.from_records(records, columns=["n_workers", "iter", "screening_time"])
+    df.to_csv("parallel_screening_results.csv")
 
     fig, ax = plt.subplots()
     sns.lineplot(ax=ax, data=df, x="iter", y="screening_time", hue="n_workers")
