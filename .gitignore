@@ -178,3 +178,4 @@ profile_results
 *.csv
 *.tar.gz
 *.fcidump
+*.npy

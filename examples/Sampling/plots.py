@@ -7,10 +7,11 @@ app = marimo.App(width="medium")
 @app.cell
 def _():
     import pickle as pkl
+    import numpy as np
     import matplotlib.pyplot as plt
     import marimo as mo
 
-    return mo, pkl, plt
+    return mo, np, pkl, plt
 
 
 @app.cell
@@ -62,16 +63,26 @@ def _(handoff_data):
 
 
 @app.cell
-def _(energies):
-    print(energies)
-    return
+def _(np):
+    exact_energies = np.load("exact_energies.npy")
+    noisy_energies = np.load("noisy_energies.npy")
+    return exact_energies, noisy_energies
 
 
 @app.cell
-def _(energies, hardware_energies, linalg_energies, plt):
+def _(
+    energies,
+    exact_energies,
+    hardware_energies,
+    linalg_energies,
+    noisy_energies,
+    plt,
+):
     fig2, ax2 = plt.subplots()
     ax2.plot(range(len(linalg_energies)), linalg_energies, '.', color="blue", label="LinAlgAdapt")
     ax2.plot(range(len(linalg_energies), len(energies)), hardware_energies, '.', color="red", label="SampledLinAlgAdapt")
+    ax2.plot(range(len(exact_energies)), exact_energies, "v", color="orange", alpha=0.5, label="Exact simulator")
+    ax2.plot(range(len(noisy_energies)), noisy_energies, ">", color="purple", alpha=0.5, label="Noisy simulator")
     ax2.legend()
     ax2.set_xlabel("Iteration")
     ax2.set_ylabel("Energy")
