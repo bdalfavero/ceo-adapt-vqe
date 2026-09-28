@@ -11,21 +11,23 @@ def _():
     import numpy as np
     import matplotlib.pyplot as plt
 
-    return pickle, plt
+    return np, pickle, plt
 
 
 @app.cell
-def _(pickle):
+def _(np, pickle):
     with open("exact_results.pkl", "rb") as f:
         exact_data = pickle.load(f)
     exact_energies = exact_data["energies"]
-    return (exact_energies,)
+    noisy_sim_energies = np.load("noisy_energies.npy")
+    return exact_energies, noisy_sim_energies
 
 
 @app.cell
-def _(exact_energies, plt):
+def _(exact_energies, noisy_sim_energies, plt):
     fig, ax = plt.subplots()
     ax.plot(range(len(exact_energies)), exact_energies, '.', label="Exact Aer simulator")
+    ax.plot(range(len(noisy_sim_energies)), noisy_sim_energies, '.', label="Exact training, noisy sim")
     ax.legend()
     ax.set_xlabel("Iteration")
     ax.set_ylabel("Energy")
