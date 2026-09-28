@@ -5,7 +5,7 @@ Created on Wed Jun 29 10:00:03 2022
 @author: mafal
 """
 
-from typing import Optional
+from typing import Optional, Callable
 
 from warnings import warn
 
@@ -28,6 +28,8 @@ from openfermion import get_sparse_operator, count_qubits
 from openfermion.transforms import get_fermion_operator, freeze_orbitals
 
 from scipy.sparse import issparse
+
+from qiskit.quantum_info.operators import SparsePauliOp
 from qiskit_aer.primitives import Estimator
 from qiskit.primitives import StatevectorEstimator
 
@@ -3875,9 +3877,15 @@ class SampledLinAlgAdapt(LinAlgAdapt):
     If shots is None implements sampling noise free algorithm
     """
 
-    def __init__(self, *args, of_hamiltonian: Optional[FermionOperator | QubitOperator]=None, **kvargs):
+    def __init__(
+        self, *args, 
+        of_hamiltonian: Optional[FermionOperator | QubitOperator]=None,
+        custom_callback: Optional[Callable[[QuantumCircuit, SparsePauliOp, int], float]]=None,
+        **kvargs
+    ):
 
         self.of_hamiltonian = of_hamiltonian
+        self.custom_callback = custom_callback
         super().__init__(*args, **kvargs)
 
         # assert self.pool.name == "no_z_pauli_pool"
@@ -3915,10 +3923,13 @@ class SampledLinAlgAdapt(LinAlgAdapt):
                 if s:
                     qc.x(self.n - 1 - q)
         if np.sum(np.abs(observable.simplify().coeffs)) >= 1e-16:
-            estimator = StatevectorEstimator()
-            job = estimator.run([(qc, observable.simplify())])
-            result = job.result()
-            exp_value = result[0].data.evs.tolist()
+            if self.custom_callback is None:
+                estimator = StatevectorEstimator()
+                job = estimator.run([(qc, observable.simplify())])
+                result = job.result()
+                exp_value = result[0].data.evs.tolist()
+            else:
+                exp_value = self.custom_callback(qc, observable.simplify(), self.shots)
         else:
             # Sometimes we pass in an observable that is just 0. becuase
             # the pool operator commutes with the Hamiltonian.
