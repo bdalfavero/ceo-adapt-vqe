@@ -3910,17 +3910,20 @@ class SampledLinAlgAdapt(LinAlgAdapt):
                 self.pool, indices=indices, coefficients=coefficients, include_ref=True
             )
         except AttributeError:
-            # TODO Replace with reference circuit!
-            ket = self.get_state(coefficients, indices, ref_state)
-
-            if issparse(ket):
-                ket = ket.toarray()
-            else:
-                ket = np.array(ket)
-
-            ket = ket[:, 0]
             qc = QuantumCircuit(self.n)
-            qc.initialize(ket)
+            for q, s in enumerate(self.ref_det):
+                if s:
+                    qc.x(self.n - 1 - q)
+            # ket = self.get_state(coefficients, indices, ref_state)
+
+            # if issparse(ket):
+            #     ket = ket.toarray()
+            # else:
+            #     ket = np.array(ket)
+
+            # ket = ket[:, 0]
+            # qc = QuantumCircuit(self.n)
+            # qc.initialize(ket)
 
         if np.sum(np.abs(observable.simplify().coeffs)) >= 1e-16:
             estimator = StatevectorEstimator()
