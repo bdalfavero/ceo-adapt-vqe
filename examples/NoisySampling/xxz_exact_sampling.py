@@ -1,4 +1,5 @@
 from typing import Optional
+import pickle
 
 import numpy as np
 from scipy.sparse.linalg import expm, expm_multiply
@@ -6,6 +7,7 @@ from scipy.sparse.linalg import expm, expm_multiply
 from openfermion import get_sparse_operator
 
 from qiskit import QuantumCircuit
+from qiskit.qasm2 import dump
 from qiskit.quantum_info.operators import SparsePauliOp
 from qiskit.quantum_info import Operator, process_fidelity
 from qiskit.transpiler import generate_preset_pass_manager
@@ -16,6 +18,8 @@ from adaptvqe.pools import FullPauliPool, TiledPauliPool
 from adaptvqe.algorithms.adapt_vqe import LinAlgAdapt, SampledLinAlgAdapt
 from adaptvqe.hamiltonians import XXZHamiltonian
 from adaptvqe.circuits import get_circuit_energy
+
+CIRCUIT_DIR = "exact_circuits/"
 
 def simulate_exactly(qc: QuantumCircuit, qiskit_hamiltonian: SparsePauliOp, shots: Optional[int]) -> float:
     """Use an exact Aer simulator. See https://quantum.cloud.ibm.com/docs/en/guides/simulate-with-qiskit-aer"""
@@ -63,3 +67,20 @@ if __name__ == "__main__":
     assert np.abs(energy-data.result.energy) < 10**-6
     energy_err = np.abs(h.ground_energy - energy)
     print(f"Ground state energy error {energy_err}")
+
+    iter_circuit_fname_dict = {}
+    for i, (indices, coeffs) in enumerate(zip(data.evolution.indices, data.evolution.coefficients)):
+        qc = data.get_circuit(pool, indices, coeffs, include_ref=True)
+        circuit_fname = CIRCUIT_DIR + f"xxz_circuit{i}.qasm"
+        iter_circuit_fname_dict[i] = circuit_fname
+        dump(qc, circuit_fname)
+
+    energies = np.array(data.evolution.energies)
+    output_data = {
+        "energies": energies.tolist(),
+        "iteration_circuits": iter_circuit_fname_dict,
+        "indices": data.evolution.indices,
+        "coefficients": data.evolution.coefficients
+    }
+    with open("exact_results.pkl", "wb") as f:
+        pickle.dump(output_data, f)
