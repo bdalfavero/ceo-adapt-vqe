@@ -11,7 +11,7 @@ from adaptvqe.algorithms.adapt_vqe import LinAlgAdapt, SampledLinAlgAdapt
 from adaptvqe.hamiltonians import XXZHamiltonian
 from adaptvqe.circuits import get_circuit_energy
 
-l = 6
+l = 4
 j_xy = 1
 j_z = 1
 h = XXZHamiltonian(j_xy, j_z, l)

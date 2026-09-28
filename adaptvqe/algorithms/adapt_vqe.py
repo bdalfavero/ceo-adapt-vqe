@@ -3902,9 +3902,15 @@ class SampledLinAlgAdapt(LinAlgAdapt):
         backend = FakeFez()
 
         try:
+            if indices is None:
+                indices = self.indices
+                coefficients = self.coefficients
             data = self.data
-            qc = data.get_circuit(self.pool,include_ref=True)
+            qc = data.get_circuit(
+                self.pool, indices=indices, coefficients=coefficients, include_ref=True
+            )
         except AttributeError:
+            # TODO Replace with reference circuit!
             ket = self.get_state(coefficients, indices, ref_state)
 
             if issparse(ket):
