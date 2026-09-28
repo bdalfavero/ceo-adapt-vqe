@@ -3861,7 +3861,7 @@ class LinAlgAdapt(AdaptVQE):
 
 
 from qiskit import QuantumCircuit
-from adaptvqe.op_conv import to_qiskit_operator
+from adaptvqe.op_conv import to_qiskit_operator, csc_to_qiskit_operator
 
 
 class SampledLinAlgAdapt(LinAlgAdapt):
@@ -3879,7 +3879,11 @@ class SampledLinAlgAdapt(LinAlgAdapt):
         assert not self.orb_opt
 
     def save_hamiltonian(self, hamiltonian):
-        self.hamiltonian = to_qiskit_operator(hamiltonian, little_endian=False)
+        if isinstance(hamiltonian, csc_matrix):
+            # TODO We shouldn't have to do this in the first place. Find a workaround.
+            self.hamiltonian = csc_to_qiskit_operator(hamiltonian)
+        else:
+            self.hamiltonian = to_qiskit_operator(hamiltonian, little_endian=False)
 
     def evaluate_observable(
         self,

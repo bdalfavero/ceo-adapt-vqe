@@ -16,7 +16,7 @@ from openfermion import (
     jordan_wigner,
 )
 import qiskit
-from qiskit.quantum_info.operators import SparsePauliOp
+from qiskit.quantum_info.operators import SparsePauliOp, Operator
 from qiskit.qasm3 import dumps
 
 # todo: use stable version of qiskit only
@@ -166,6 +166,11 @@ def to_qiskit_term(of_term, n, switch_endianness):
     qiskit_op = coefficient * qiskit_op
 
     return qiskit_op
+
+
+def csc_to_qiskit_operator(csc_mat):
+    op = Operator(csc_mat.todense())
+    return SparsePauliOp.from_operator(op)
 
 
 def to_qiskit_operator(of_operator, n=None, little_endian=True):

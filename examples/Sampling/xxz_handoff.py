@@ -11,7 +11,7 @@ from adaptvqe.algorithms.adapt_vqe import LinAlgAdapt, SampledLinAlgAdapt
 from adaptvqe.hamiltonians import XXZHamiltonian
 from adaptvqe.circuits import get_circuit_energy
 
-l = 4
+l = 6
 j_xy = 1
 j_z = 1
 h = XXZHamiltonian(j_xy, j_z, l)
@@ -34,7 +34,8 @@ data = my_adapt.data
 
 print("Running SampledLinAlgAdapt")
 sampled_adapt = SampledLinAlgAdapt(
-    custom_hamiltonian=h,
+    # custom_hamiltonian=h,
+    previous_data=data,
     pool=pool,
     verbose=True,
     threshold=10**-5,
@@ -55,3 +56,5 @@ qc = data.get_circuit(pool,include_ref=True)
 energy = get_circuit_energy(qc,h.operator)
 print("\nEnergy from circuit: ", energy)
 assert np.abs(energy-data.result.energy) < 10**-6
+energy_err = np.abs(h.ground_energy - energy)
+print(f"Ground state energy error {energy_err}")
