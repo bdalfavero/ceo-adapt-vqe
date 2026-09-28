@@ -39,7 +39,6 @@ data = my_adapt.data
 
 print("Running SampledLinAlgAdapt")
 sampled_adapt = SampledLinAlgAdapt(
-    # custom_hamiltonian=h,
     previous_data=data,
     pool=pool,
     verbose=True,
@@ -49,6 +48,7 @@ sampled_adapt = SampledLinAlgAdapt(
     sel_criterion="gradient",
     recycle_hessian=False,
     rand_degenerate=True,
+    of_hamiltonian=h.operator
 )
 sampled_adapt.load(data)
 sampled_adapt.run()

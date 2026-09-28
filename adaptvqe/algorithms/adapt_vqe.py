@@ -5,6 +5,8 @@ Created on Wed Jun 29 10:00:03 2022
 @author: mafal
 """
 
+from typing import Optional
+
 from warnings import warn
 
 import multiprocessing
@@ -21,6 +23,7 @@ from scipy.sparse import csc_matrix, issparse
 from scipy.sparse.linalg import expm, expm_multiply
 
 import openfermion as of
+from openfermion import QubitOperator, FermionOperator
 from openfermion import get_sparse_operator, count_qubits
 from openfermion.transforms import get_fermion_operator, freeze_orbitals
 
@@ -312,7 +315,6 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         else:
             hamiltonian = self.initialize_with_hamiltonian()
 
-        # TODO load the MPO form a file!
         self.save_hamiltonian(hamiltonian)
 
     def initialize_with_molecule(self):
@@ -3873,8 +3875,9 @@ class SampledLinAlgAdapt(LinAlgAdapt):
     If shots is None implements sampling noise free algorithm
     """
 
-    def __init__(self, *args, **kvargs):
+    def __init__(self, *args, of_hamiltonian: Optional[FermionOperator | QubitOperator]=None, **kvargs):
 
+        self.of_hamiltonian = of_hamiltonian
         super().__init__(*args, **kvargs)
 
         # assert self.pool.name == "no_z_pauli_pool"
@@ -3882,8 +3885,11 @@ class SampledLinAlgAdapt(LinAlgAdapt):
 
     def save_hamiltonian(self, hamiltonian):
         if isinstance(hamiltonian, csc_matrix):
-            # TODO We shouldn't have to do this in the first place. Find a workaround.
-            self.hamiltonian = csc_to_qiskit_operator(hamiltonian)
+            if self.of_hamiltonian is not None:
+                self.hamiltonian = to_qiskit_operator(self.of_hamiltonian, little_endian=False)
+            else:
+                warn("Converting from sparse")
+                self.hamiltonian = csc_to_qiskit_operator(hamiltonian)
         else:
             self.hamiltonian = to_qiskit_operator(hamiltonian, little_endian=False)
 
