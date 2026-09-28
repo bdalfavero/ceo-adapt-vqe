@@ -86,12 +86,7 @@ def _(
     ax2.legend()
     ax2.set_xlabel("Iteration")
     ax2.set_ylabel("Energy")
-    return
-
-
-@app.cell
-def _(k):
-    k
+    plt.savefig("sampling.pdf")
     return
 
 
