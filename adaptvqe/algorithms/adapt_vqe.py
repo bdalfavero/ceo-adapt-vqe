@@ -24,7 +24,9 @@ import openfermion as of
 from openfermion import get_sparse_operator, count_qubits
 from openfermion.transforms import get_fermion_operator, freeze_orbitals
 
-from qiskit import transpile
+from scipy.sparse import issparse
+from qiskit_aer.primitives import Estimator
+from qiskit.primitives import StatevectorEstimator
 
 from quimb.tensor.tensor_1d import MatrixProductState, MatrixProductOperator
 
@@ -3893,14 +3895,6 @@ class SampledLinAlgAdapt(LinAlgAdapt):
         ref_state=None,
         orb_params=None,
     ):
-        from scipy.sparse import issparse
-        # from qiskit_ibm_runtime import EstimatorV2 as Estimator
-        from qiskit_aer.primitives import Estimator
-        from qiskit.primitives import StatevectorEstimator
-        from qiskit_ibm_runtime.fake_provider import FakeFez
-
-        backend = FakeFez()
-
         try:
             if indices is None:
                 indices = self.indices
@@ -3914,17 +3908,6 @@ class SampledLinAlgAdapt(LinAlgAdapt):
             for q, s in enumerate(self.ref_det):
                 if s:
                     qc.x(self.n - 1 - q)
-            # ket = self.get_state(coefficients, indices, ref_state)
-
-            # if issparse(ket):
-            #     ket = ket.toarray()
-            # else:
-            #     ket = np.array(ket)
-
-            # ket = ket[:, 0]
-            # qc = QuantumCircuit(self.n)
-            # qc.initialize(ket)
-
         if np.sum(np.abs(observable.simplify().coeffs)) >= 1e-16:
             estimator = StatevectorEstimator()
             job = estimator.run([(qc, observable.simplify())])
