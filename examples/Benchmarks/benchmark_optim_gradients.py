@@ -21,6 +21,7 @@ Usage:
 
 import os
 import time
+import pickle
 import numpy as np
 from openfermion import MolecularData
 from openfermionpyscf import run_pyscf
@@ -28,7 +29,7 @@ from adaptvqe.algorithms.adapt_vqe import TensorNetAdapt
 from adaptvqe.pools import GSD
 
 # ── config ────────────────────────────────────────────────────────────────────
-N = 10
+N = 8
 R = 1.5
 geometry = [["H", [0, 0, i * R]] for i in range(N)]
 MAX_MPS_BOND  = 16
@@ -159,6 +160,9 @@ for depth in ANSATZ_DEPTHS:
             row += f"  {t_ref/t:>{col}.2f}x"
     print(row[:120])
 
-print()
-print(f"max_mps_bond={MAX_MPS_BOND}. Increase it for a more realistic crossover point.")
-print("Tip: PSR >1x with fewer workers than FD means exactness comes for free.")
+with open("optim_results.pkl", "wb") as f:
+    pickle.dump(results, f)
+
+# print()
+# print(f"max_mps_bond={MAX_MPS_BOND}. Increase it for a more realistic crossover point.")
+# print("Tip: PSR >1x with fewer workers than FD means exactness comes for free.")
