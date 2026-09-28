@@ -48,8 +48,8 @@ def _(mo):
 
 @app.cell
 def _(pkl):
-    with open("xxz_handoff_results.pkl", "rb") as f:
-        handoff_data = pkl.load(f)
+    with open("xxz_handoff_results.pkl", "rb") as f2:
+        handoff_data = pkl.load(f2)
     return (handoff_data,)
 
 
@@ -86,7 +86,12 @@ def _(
     ax2.legend()
     ax2.set_xlabel("Iteration")
     ax2.set_ylabel("Energy")
-    plt.savefig("sampling.pdf")
+    plt.savefig("sampling.png")
+    return
+
+
+@app.cell
+def _():
     return
 
 
