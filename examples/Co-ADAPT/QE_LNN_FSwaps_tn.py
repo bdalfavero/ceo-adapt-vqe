@@ -15,6 +15,8 @@ chi = 70
 r = 3
 molecule = create_h4(r)
 pool = QE(molecule)
+for op in pool.operators:
+    op.create_sparse()
 
 # Run ADAPT-VQE with a CNOT penalty applied to operator gradients during the selection stage.
 # This favors the selection of operators that require lower gate counts to be implemented.
