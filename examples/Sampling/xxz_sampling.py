@@ -36,3 +36,5 @@ qc = data.get_circuit(pool,include_ref=True)
 energy = get_circuit_energy(qc,h.operator)
 print("\nEnergy from circuit: ", energy)
 assert np.abs(energy-data.result.energy) < 10**-6
+energy_err = np.abs(h.ground_energy - energy)
+print(f"Ground state energy error {energy_err}")
