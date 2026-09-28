@@ -35,6 +35,7 @@ def _(exact_energies, noisy_sim_energies, noisy_training_energies, plt):
     ax.legend()
     ax.set_xlabel("Iteration")
     ax.set_ylabel("Energy")
+    plt.savefig("noisy_sampling.png")
     return
 
 
