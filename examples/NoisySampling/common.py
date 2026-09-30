@@ -8,8 +8,10 @@ from qiskit.quantum_info.operators import SparsePauliOp
 from qiskit.transpiler import generate_preset_pass_manager
 from qiskit_aer import AerSimulator
 from qiskit_aer.primitives import EstimatorV2 as Estimator
+from qiskit.primitives import BackendEstimatorV2
 from qiskit_aer.noise import NoiseModel, depolarizing_error
 from qiskit.qasm2 import dump
+from qiskit_ibm_runtime.fake_provider import FakeFez
 
 from adaptvqe.pools import FullPauliPool, TiledPauliPool
 from adaptvqe.algorithms.adapt_vqe import LinAlgAdapt, SampledLinAlgAdapt
@@ -31,7 +33,10 @@ def simulate_exactly(qc: QuantumCircuit, qiskit_hamiltonian: SparsePauliOp, shot
     return exact_value
 
 
-def simulate_noisily(qc: QuantumCircuit, qiskit_hamiltonian: SparsePauliOp, shots: Optional[int]) -> float:
+def simulate_noisily(
+    qc: QuantumCircuit, qiskit_hamiltonian: SparsePauliOp, shots: Optional[int],
+    use_depolarizing: bool=False
+) -> float:
     """Use an exact Aer simulator. See https://quantum.cloud.ibm.com/docs/en/guides/simulate-with-qiskit-aer"""
 
     # The circuit needs to be transpiled to the AerSimulator target
@@ -39,15 +44,18 @@ def simulate_noisily(qc: QuantumCircuit, qiskit_hamiltonian: SparsePauliOp, shot
     isa_circuit = pass_manager.run(qc)
     pub = (isa_circuit, qiskit_hamiltonian)
     # Use a noisy circuit simulator to get energies.
-    noise_model = NoiseModel()
-    cx_depolarizing_prob = 0.02
-    noise_model.add_all_qubit_quantum_error(
-        depolarizing_error(cx_depolarizing_prob, 2), ["cx"]
-    )
-
-    noisy_estimator = Estimator(
-        options=dict(backend_options=dict(noise_model=noise_model))
-    )
+    if use_depolarizing:
+        noise_model = NoiseModel()
+        cx_depolarizing_prob = 0.02
+        noise_model.add_all_qubit_quantum_error(
+            depolarizing_error(cx_depolarizing_prob, 2), ["cx"]
+        )
+        noisy_estimator = Estimator(
+            options=dict(backend_options=dict(noise_model=noise_model))
+        )
+    else:
+        device_backend = FakeFez()
+        noisy_estimator = BackendEstimatorV2(backend=device_backend)
     job = noisy_estimator.run([pub])
     result = job.result()
     pub_result = result[0]
