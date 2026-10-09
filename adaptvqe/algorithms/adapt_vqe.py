@@ -3886,7 +3886,10 @@ class SampledLinAlgAdapt(LinAlgAdapt):
 
         self.of_hamiltonian = of_hamiltonian
         self.custom_callback = custom_callback
+        # LinAlgAdapt rejects finite shots, but here they are passed on to custom_callback.
+        shots = kvargs.pop("shots", None)
         super().__init__(*args, **kvargs)
+        self.shots = shots
 
         # assert self.pool.name == "no_z_pauli_pool"
         assert not self.orb_opt
