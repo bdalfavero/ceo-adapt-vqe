@@ -41,7 +41,7 @@ from ..circuits import prepare_lnn_op, count_lnn_swaps, swap_lnn, get_swaps
 from ..matrix_tools import ket_to_sparse_vector
 from ..minimize import minimize_bfgs
 from ..pools import ImplementationType
-from ..utils import bfgs_update
+from ..utils import bfgs_update, save_to_file
 from ..tensor_helpers import computational_basis_mps, qubop_to_mpo
 from quimb.tensor.tensor_1d_compress import tensor_network_1d_compress_direct
 
@@ -99,6 +99,8 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         mpo_filename=None,
         n_screening_workers=1,
         n_optim_workers=1,
+        checkpoint_interval=None,
+        checkpoint_prefix="adapt_data"
     ):
         """
         Arguments:
@@ -146,6 +148,8 @@ class AdaptVQE(metaclass=abc.ABCMeta):
             previous_data (AdaptData): data from a previous run of ADAPT we wish to continue
             skip_converged_rename - Skip rename of the data file upon convergence. Defaults to False.
             Note that this is used to run an artificially high number of iterations.
+            checkpoint_interval - Interval for how often we save the ADAPT data to a file mid-run. If None, never checkpoint.
+            checkpoint_prefix - Prefix for the filename. It will be saved as <prefix>_i<iteration>.pkl.
         """
 
         self.pool = pool
@@ -176,6 +180,10 @@ class AdaptVQE(metaclass=abc.ABCMeta):
         self.n_screening_workers = n_screening_workers
         self.n_optim_workers = n_optim_workers
         self._screening_pool = None  # persistent worker processes, created on first parallel sweep
+        self._checkpoint_interval = checkpoint_interval
+        self._checkpoint_prefix = checkpoint_prefix
+        if self._checkpoint_interval is not None:
+            assert self._checkpoint_prefix is not None
 
         # Attributes describing type of CEO pool, when applicable. The algorithm runs differently for each of them
         self.dvg = "DVG" in self.pool.name
@@ -365,10 +373,15 @@ class AdaptVQE(metaclass=abc.ABCMeta):
 
         hamiltonian = self.data.hamiltonian
 
-        pre_it, post_it = self.data.file_name.split(str(self.data.iteration_counter) + "i")
-        self.file_name = "".join(
-            [pre_it, str(self.max_adapt_iter) + "i", post_it]
-        )
+        try:
+            pre_it, post_it = self.data.file_name.split(str(self.data.iteration_counter) + "i")
+            self.file_name = "".join(
+                [pre_it, str(self.max_adapt_iter) + "i", post_it]
+            )
+        except ValueError:
+            assert self._checkpoint_prefix is not None, \
+                f"{self.data.file_name} could not be parsed for an iter number. Please provide a checkpoint prefix."
+            self.file_name = f"{self._checkpoint_prefix}_{self.max_adapt_iter}i.pkl"
 
         self.exact_energy = self.data.fci_energy
         self.load(previous_data=self.data)
@@ -1388,6 +1401,9 @@ class AdaptVQE(metaclass=abc.ABCMeta):
                 # Run one iteration and check if we have converged. This might add one operator or more depending on
                 # the algorithm configuration  (e.g. if self.tetris=True, we may add multiple operators)
                 finished = self.run_iteration()
+                if self._checkpoint_interval is not None:
+                    if self.data.iteration_counter % self._checkpoint_interval == 0:
+                        save_to_file(self.data, f"{self._checkpoint_prefix}_{self.data.iteration_counter}i.pkl")
 
             if not finished:
                 # The last time we measured the gradients was in the beginning of the last iteration. Remeasure in the end
