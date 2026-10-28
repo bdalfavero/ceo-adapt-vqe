@@ -306,7 +306,10 @@ class FermionicHamiltonian:
     """
     Class for molecular Hamiltonians represented by Openfermion FermionOperators
     """
-    def __init__(self, operator,description,n_electrons,n=None, diag_mode: str="exact", mpo_filename=None, **kwargs):
+    def __init__(
+        self, operator,description,n_electrons,n=None, diag_mode: str="exact",
+        skip_sparse_ref=False, mpo_filename=None, **kwargs
+    ):
         """
         Initialize class instance.
 
@@ -338,7 +341,10 @@ class FermionicHamiltonian:
         self._ground_state = None
 
         self.ref_det = get_hf_det(n_electrons, self.n)
-        self.ref_state = ket_to_sparse_vector(self.ref_det)
+        if skip_sparse_ref:
+            self.ref_state = None
+        else:
+            self.ref_state = ket_to_sparse_vector(self.ref_det)
         self.tn_ref_state = computational_basis_mps(self.ref_det)
 
     @property
